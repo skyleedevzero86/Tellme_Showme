@@ -1,47 +1,38 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
-import type { GetUpdatesResponse } from '@/domain/types/api';
+import { useCallback, useState } from 'react';
+import type { WebhookResponse } from '@/domain/types/api';
 import { telegramApiRepository } from '@/infrastructure/api/TelegramApiRepository';
 
-export function useGetUpdates() {
-  const [status, setStatus] = useState<string>('');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const abortRef = useRef(false);
+type WebhookStatus = 'idle' | 'loading' | 'success' | 'error';
 
-  const pollOnce = useCallback(async (): Promise<GetUpdatesResponse | null> => {
+export function useWebhook() {
+  const [status, setStatus] = useState<WebhookStatus>('idle');
+  const [result, setResult] = useState<WebhookResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const setWebhook = useCallback(async (enabled: boolean) => {
+    setStatus('loading');
+    setError(null);
+    setResult(null);
     try {
-      const data = await telegramApiRepository.getUpdates();
-      setStatus(data.result);
-      setLastUpdated(new Date());
+      const data = await telegramApiRepository.setWebhook(enabled);
+      setResult(data);
+      setStatus('success');
       return data;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Error';
-      setStatus(message);
-      setLastUpdated(new Date());
-      return null;
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      setError(message);
+      setStatus('error');
+      throw e;
     }
   }, []);
 
-  const start = useCallback(() => {
-    abortRef.current = false;
-    setIsPolling(true);
-
-    const run = async () => {
-      if (abortRef.current) return;
-      await pollOnce();
-      if (abortRef.current) return;
-      setTimeout(run, 0);
-    };
-
-    run();
-  }, [pollOnce]);
-
-  const stop = useCallback(() => {
-    abortRef.current = true;
-    setIsPolling(false);
+  const reset = useCallback(() => {
+    setStatus('idle');
+    setResult(null);
+    setError(null);
   }, []);
 
-  return { status, lastUpdated, isPolling, start, stop, pollOnce };
+  return { setWebhook, status, result, error, reset };
 }
