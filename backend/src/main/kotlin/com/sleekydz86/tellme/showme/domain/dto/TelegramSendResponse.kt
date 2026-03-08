@@ -9,11 +9,11 @@ import lombok.Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 class TelegramSendResponse {
     @JsonProperty("ok")
-    private val ok: Boolean? = null
+    val ok: Boolean? = null
 
     @JsonProperty("description")
-    private val description: String? = null
+    val description: String? = null
 
     @JsonProperty("result")
-    private val result: Any? = null
+    val result: Any? = null
 }
