@@ -1,4 +1,4 @@
-package com.sleekydz86.tellme.showme.application.service
+package com.sleekydz86.tellme.showme.application.service.usecase
 
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.domain.dto.SendMessageResponse
@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 import java.io.ByteArrayInputStream
-
 
 @Service
 @RequiredArgsConstructor

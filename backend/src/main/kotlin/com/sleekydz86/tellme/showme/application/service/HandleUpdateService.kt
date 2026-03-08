@@ -10,8 +10,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 import java.nio.file.Path
-import java.util.EnumMap
-import java.util.Map
 
 
 @Service
@@ -26,23 +24,22 @@ class HandleUpdateService(
     echoHandler: EchoCommandHandler?
 ) {
     private val log = LoggerFactory.getLogger(HandleUpdateService::class.java)
-    private val commandHandlers: Map<BotCommand, CommandHandler?>
-
     private val echoHandler: CommandHandler?
+
+    private val commandHandlers: kotlin.collections.Map<BotCommand, CommandHandler?> = mapOf(
+        BotCommand.START to startHandler,
+        BotCommand.TIME to timeHandler,
+        BotCommand.HELP to helpHandler,
+        BotCommand.LOTTO to lottoHandler,
+        BotCommand.GOD to godHandler,
+        BotCommand.ENG to engHandler
+    )
 
     init {
         this.echoHandler = echoHandler
-        val map = EnumMap<BotCommand, CommandHandler?>(BotCommand::class.java)
-        map[BotCommand.START] = startHandler
-        map[BotCommand.TIME] = timeHandler
-        map[BotCommand.HELP] = helpHandler
-        map[BotCommand.LOTTO] = lottoHandler
-        map[BotCommand.GOD] = godHandler
-        map[BotCommand.ENG] = engHandler
-        commandHandlers = Map.copyOf(map)
     }
 
-    fun handle(message: TelegramUpdate.Message): Mono<Void?> {
+    fun handle(message: TelegramUpdate.Message): Mono<Void> {
         val chatId = message.chat?.id ?: return Mono.empty()
 
         if (message.text != null && !message.text.isBlank()) {
@@ -64,18 +61,19 @@ class HandleUpdateService(
         return telegramApi.sendMessage(chatId, FALLBACK_MESSAGE)!!.then()
     }
 
-    private fun handleText(chatId: Long?, message: TelegramUpdate.Message?): Mono<Void?> {
+    private fun handleText(chatId: Long?, message: TelegramUpdate.Message?): Mono<Void> {
         val ctx = MessageContext.from(message) ?: return Mono.empty()
 
         val cmd = BotCommand.from(ctx.text)
         val handler = (cmd?.let { commandHandlers[it] } ?: echoHandler) ?: return Mono.empty()
         val replyMono = handler.handle(ctx) ?: return Mono.empty()
+
         return replyMono
             .flatMap { reply -> telegramApi.sendMessage(chatId, reply)!! }
             .then()
     }
 
-    private fun handleDocument(chatId: Long?, message: TelegramUpdate.Message): Mono<Void?> {
+    private fun handleDocument(chatId: Long?, message: TelegramUpdate.Message): Mono<Void> {
         val doc = message.document!!
         val fileId = doc.fileId
         val fileName = doc.fileName ?: "document"
@@ -92,29 +90,29 @@ class HandleUpdateService(
             .then()
     }
 
-    private fun handlePhoto(chatId: Long?, message: TelegramUpdate.Message): Mono<Void?> {
+    private fun handlePhoto(chatId: Long?, message: TelegramUpdate.Message): Mono<Void> {
         val photoList = message.photo!!
         val largest = photoList[photoList.size - 1]!!
         val fileId = largest.fileId
         log.info("Photo received: fileId={}", fileId)
 
-        return telegramApi.downloadFileToLocal(fileId, "photo_" + largest.fileUniqueId + ".jpg")!!
+        return telegramApi.downloadFileToLocal(fileId, "photo_${largest.fileUniqueId}.jpg")!!
             .flatMap { localPath -> telegramApi.sendMessage(chatId, "사진을 받았습니다. (해상도 ${largest.width}x${largest.height})\n저장: $localPath")!! }
             .onErrorResume { e -> telegramApi.sendMessage(chatId, "사진 저장 중 오류: ${e.message}")!! }
             .then()
     }
 
-    private fun handleVoice(chatId: Long?, message: TelegramUpdate.Message): Mono<Void?> {
+    private fun handleVoice(chatId: Long?, message: TelegramUpdate.Message): Mono<Void> {
         val fileId = message.voice!!.fileId
         log.info("Voice received: fileId={}", fileId)
 
-        return telegramApi.downloadFileToLocal(fileId, "voice_" + message.messageId + ".ogg")!!
+        return telegramApi.downloadFileToLocal(fileId, "voice_${message.messageId}.ogg")!!
             .flatMap { localPath -> telegramApi.sendMessage(chatId, "음성 메시지를 받았습니다. 저장: $localPath")!! }
             .onErrorResume { e -> telegramApi.sendMessage(chatId, "음성 저장 중 오류: ${e.message}")!! }
             .then()
     }
 
-    private fun handleVideo(chatId: Long?, message: TelegramUpdate.Message): Mono<Void?> {
+    private fun handleVideo(chatId: Long?, message: TelegramUpdate.Message): Mono<Void> {
         val fileId = message.video!!.fileId
         val fileName = "video_${message.messageId}.mp4"
         log.info("Video received: fileId={}", fileId)

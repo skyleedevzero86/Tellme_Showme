@@ -3,8 +3,8 @@ package com.sleekydz86.tellme.showme.application.service.usecase
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.application.service.HandleUpdateService
 import com.sleekydz86.tellme.showme.domain.dto.TelegramUpdate
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import tools.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import java.util.concurrent.atomic.AtomicLong
 
@@ -39,7 +39,7 @@ class PollUpdatesUseCase(
                 continue
             }
 
-            val processedTexts: MutableList<String?> = ArrayList<String?>()
+            val processedTexts = mutableListOf<String>()
             for (ur in update.result!!) {
                 val u = ur ?: continue
                 if (u.updateId != null && u.updateId > lastUpdateId.get() && u.message != null) {
@@ -49,7 +49,7 @@ class PollUpdatesUseCase(
                 }
             }
             if (processedTexts.isNotEmpty()) {
-                result = jsonResult("수신된 메시지(" + processedTexts.filterNotNull().joinToString(", ") + ")를 처리함.")
+                result = jsonResult("수신된 메시지(" + processedTexts.joinToString(", ") + ")를 처리함.")
                 break
             }
             if (sleepInterruptible()) {
@@ -71,8 +71,8 @@ class PollUpdatesUseCase(
 
     private fun jsonResult(message: String?): java.lang.String? {
         return try {
-            objectMapper.writeValueAsString(mapOf("result" to (message ?: ""))) as java.lang.String?
-        } catch (e: com.fasterxml.jackson.core.JsonProcessingException) {
+            objectMapper.writeValueAsString(mapOf<String, String>("result" to (message ?: ""))) as java.lang.String?
+        } catch (e: tools.jackson.core.JacksonException) {
             ERROR_JSON as java.lang.String
         }
     }
