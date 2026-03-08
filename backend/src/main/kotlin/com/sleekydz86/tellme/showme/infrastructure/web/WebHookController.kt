@@ -85,7 +85,10 @@ class WebHookController(
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
-    fun fileUpload(@RequestParam("filename") file: MultipartFile?): Mono<ResponseEntity<SendMessageResponse>> {
+    fun fileUpload(
+        @RequestParam("filename") file: MultipartFile?,
+        @RequestParam(value = "caption", required = false) caption: String?
+    ): Mono<ResponseEntity<SendMessageResponse>> {
         val channel: String? = properties.channelUsername
         if (file == null || file.isEmpty) {
             return Mono.just(ResponseEntity.ok().body(SendMessageResponse("fail", null)))
@@ -98,7 +101,32 @@ class WebHookController(
             log.warn("file_upload read error", e)
             return Mono.just(ResponseEntity.ok().body(SendMessageResponse("fail", null)))
         }
-        return channelBroadcastUseCase.sendPhoto(channel, bytes, fileName)
+        return channelBroadcastUseCase.sendPhoto(channel, bytes, fileName, caption)
+            .map { ResponseEntity.ok(it) }
+    }
+
+    @PostMapping(
+        value = ["/document_upload.do"],
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun documentUpload(
+        @RequestParam("filename") file: MultipartFile?,
+        @RequestParam(value = "caption", required = false) caption: String?
+    ): Mono<ResponseEntity<SendMessageResponse>> {
+        val channel: String? = properties.channelUsername
+        if (file == null || file.isEmpty) {
+            return Mono.just(ResponseEntity.ok().body(SendMessageResponse("fail", null)))
+        }
+        val fileName = file.originalFilename ?: "document"
+        val bytes: ByteArray
+        try {
+            bytes = file.bytes
+        } catch (e: Exception) {
+            log.warn("document_upload read error", e)
+            return Mono.just(ResponseEntity.ok().body(SendMessageResponse("fail", null)))
+        }
+        return channelBroadcastUseCase.sendDocument(channel, bytes, fileName, caption)
             .map { ResponseEntity.ok(it) }
     }
 

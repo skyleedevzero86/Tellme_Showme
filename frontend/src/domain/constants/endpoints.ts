@@ -6,4 +6,5 @@ export const ENDPOINTS = {
   GET_UPDATES: 'get_updates.do',
   SEND_MESSAGE: 'send_message.do',
   FILE_UPLOAD: 'file_upload.do',
+  DOCUMENT_UPLOAD: 'document_upload.do',
 } as const;

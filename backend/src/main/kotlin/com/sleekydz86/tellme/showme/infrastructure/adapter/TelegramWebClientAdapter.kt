@@ -7,6 +7,7 @@ import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramUpdate
 import com.sleekydz86.tellme.showme.domain.dto.WebhookInfoResponse
 import org.slf4j.LoggerFactory
+import org.springframework.core.io.ByteArrayResource
 import org.springframework.core.io.InputStreamResource
 import org.springframework.http.MediaType
 import org.springframework.beans.factory.annotation.Qualifier
@@ -227,18 +228,40 @@ class TelegramWebClientAdapter(
         channelIdOrUsername: String?,
         caption: String?,
         fileName: String?,
-        photoStream: InputStream?,
-        size: Long
+        photoBytes: ByteArray?
     ): Mono<TelegramSendResponse>? {
-        if (photoStream == null) return Mono.empty()
+        if (photoBytes == null || photoBytes.isEmpty()) return Mono.empty()
+        val name = fileName?.takeIf { it.isNotBlank() } ?: "photo.jpg"
         val body: MultiValueMap<String, Any> = LinkedMultiValueMap()
         body.add("chat_id", channelIdOrUsername ?: "")
         if (!caption.isNullOrBlank()) body.add("caption", caption)
-        body.add("photo", object : InputStreamResource(photoStream) {
-            override fun getFilename(): String = fileName?.takeIf { it.isNotBlank() } ?: "photo.jpg"
+        body.add("photo", object : ByteArrayResource(photoBytes) {
+            override fun getFilename(): String = name
         })
         return telegramWebClient.post()
             .uri("/bot" + botToken() + "/sendPhoto")
+            .contentType(MediaType.MULTIPART_FORM_DATA)
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(TelegramSendResponse::class.java)
+    }
+
+    override fun sendDocumentToChannel(
+        channelIdOrUsername: String?,
+        caption: String?,
+        fileName: String?,
+        documentBytes: ByteArray?
+    ): Mono<TelegramSendResponse>? {
+        if (documentBytes == null || documentBytes.isEmpty()) return Mono.empty()
+        val name = fileName?.takeIf { it.isNotBlank() } ?: "document"
+        val body: MultiValueMap<String, Any> = LinkedMultiValueMap()
+        body.add("chat_id", channelIdOrUsername ?: "")
+        if (!caption.isNullOrBlank()) body.add("caption", caption)
+        body.add("document", object : ByteArrayResource(documentBytes) {
+            override fun getFilename(): String = name
+        })
+        return telegramWebClient.post()
+            .uri("/bot" + botToken() + "/sendDocument")
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .bodyValue(body)
             .retrieve()

@@ -46,7 +46,16 @@ interface TelegramApiPort {
     ): Mono<TelegramSendResponse>?
 
     fun sendPhotoToChannel(
-        channelIdOrUsername: String?, caption: String?,
-        fileName: String?, photoStream: InputStream?, size: Long
+        channelIdOrUsername: String?,
+        caption: String?,
+        fileName: String?,
+        photoBytes: ByteArray?
+    ): Mono<TelegramSendResponse>?
+
+    fun sendDocumentToChannel(
+        channelIdOrUsername: String?,
+        caption: String?,
+        fileName: String?,
+        documentBytes: ByteArray?
     ): Mono<TelegramSendResponse>?
 }

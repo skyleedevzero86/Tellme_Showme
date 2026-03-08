@@ -72,10 +72,27 @@ export const telegramApiRepository = {
     return res.json();
   },
 
-  async uploadPhoto(file: File): Promise<SendMessageResponse> {
+  async uploadPhoto(file: File, caption?: string): Promise<SendMessageResponse> {
     const formData = new FormData();
     formData.append('filename', file);
+    if (caption != null && caption.trim() !== '') {
+      formData.append('caption', caption.trim().slice(0, 1024));
+    }
     const res = await fetch(buildUrl(ENDPOINTS.FILE_UPLOAD), {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  },
+
+  async uploadDocument(file: File, caption?: string): Promise<SendMessageResponse> {
+    const formData = new FormData();
+    formData.append('filename', file);
+    if (caption != null && caption.trim() !== '') {
+      formData.append('caption', caption.trim().slice(0, 1024));
+    }
+    const res = await fetch(buildUrl(ENDPOINTS.DOCUMENT_UPLOAD), {
       method: 'POST',
       body: formData,
     });

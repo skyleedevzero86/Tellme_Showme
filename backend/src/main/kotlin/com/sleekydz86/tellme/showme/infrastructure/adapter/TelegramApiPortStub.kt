@@ -61,8 +61,15 @@ class TelegramApiPortStub : TelegramApiPort {
         channelIdOrUsername: String?,
         caption: String?,
         fileName: String?,
-        photoStream: InputStream?,
-        size: Long
+        photoBytes: ByteArray?
+    ): Mono<TelegramSendResponse> =
+        Mono.just(TelegramSendResponse(ok = true, description = null, result = null))
+
+    override fun sendDocumentToChannel(
+        channelIdOrUsername: String?,
+        caption: String?,
+        fileName: String?,
+        documentBytes: ByteArray?
     ): Mono<TelegramSendResponse> =
         Mono.just(TelegramSendResponse(ok = true, description = null, result = null))
 }

@@ -6,9 +6,12 @@ import { telegramApiRepository } from '@/infrastructure/api/TelegramApiRepositor
 
 type BroadcastStatus = 'idle' | 'loading' | 'success' | 'error';
 
+export type SendType = 'message' | 'photo' | 'document';
+
 export function useChannelBroadcast() {
   const [messageStatus, setMessageStatus] = useState<BroadcastStatus>('idle');
   const [photoStatus, setPhotoStatus] = useState<BroadcastStatus>('idle');
+  const [documentStatus, setDocumentStatus] = useState<BroadcastStatus>('idle');
   const [lastResult, setLastResult] = useState<SendMessageResponse | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +35,11 @@ export function useChannelBroadcast() {
     }
   }, []);
 
-  const uploadPhoto = useCallback(async (file: File) => {
+  const uploadPhoto = useCallback(async (file: File, caption?: string) => {
     setPhotoStatus('loading');
     setError(null);
     try {
-      const data = await telegramApiRepository.uploadPhoto(file);
+      const data = await telegramApiRepository.uploadPhoto(file, caption);
       setLastResult(data);
       setLastUpdated(new Date());
       setPhotoStatus(data.status === 'ok' ? 'success' : 'error');
@@ -51,9 +54,29 @@ export function useChannelBroadcast() {
     }
   }, []);
 
+  const uploadDocument = useCallback(async (file: File, caption?: string) => {
+    setDocumentStatus('loading');
+    setError(null);
+    try {
+      const data = await telegramApiRepository.uploadDocument(file, caption);
+      setLastResult(data);
+      setLastUpdated(new Date());
+      setDocumentStatus(data.status === 'ok' ? 'success' : 'error');
+      if (data.status !== 'ok') setError('전송에 실패했습니다.');
+      return data;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      setError(msg);
+      setDocumentStatus('error');
+      setLastUpdated(new Date());
+      throw e;
+    }
+  }, []);
+
   const reset = useCallback(() => {
     setMessageStatus('idle');
     setPhotoStatus('idle');
+    setDocumentStatus('idle');
     setLastResult(null);
     setError(null);
   }, []);
@@ -61,8 +84,10 @@ export function useChannelBroadcast() {
   return {
     sendMessage,
     uploadPhoto,
+    uploadDocument,
     messageStatus,
     photoStatus,
+    documentStatus,
     lastResult,
     lastUpdated,
     error,
