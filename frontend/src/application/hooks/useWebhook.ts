@@ -11,12 +11,12 @@ export function useWebhook() {
   const [result, setResult] = useState<WebhookResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const setWebhook = useCallback(async (enabled: boolean) => {
+  const setWebhook = useCallback(async (enabled: boolean, url?: string) => {
     setStatus('loading');
     setError(null);
     setResult(null);
     try {
-      const data = await telegramApiRepository.setWebhook(enabled);
+      const data = await telegramApiRepository.setWebhook(enabled, url);
       setResult(data);
       setStatus('success');
       return data;

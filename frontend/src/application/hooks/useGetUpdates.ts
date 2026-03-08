@@ -8,6 +8,7 @@ export function useGetUpdates() {
   const [status, setStatus] = useState<string>('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [lastWebhookActive, setLastWebhookActive] = useState(false);
   const abortRef = useRef(false);
 
   const pollOnce = useCallback(async (): Promise<GetUpdatesResponse | null> => {
@@ -15,11 +16,13 @@ export function useGetUpdates() {
       const data = await telegramApiRepository.getUpdates();
       setStatus(data.result);
       setLastUpdated(new Date());
+      setLastWebhookActive(Boolean(data.webhookActive));
       return data;
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Error';
       setStatus(message);
       setLastUpdated(new Date());
+      setLastWebhookActive(false);
       return null;
     }
   }, []);
@@ -43,5 +46,5 @@ export function useGetUpdates() {
     setIsPolling(false);
   }, []);
 
-  return { status, lastUpdated, isPolling, start, stop, pollOnce };
+  return { status, lastUpdated, isPolling, start, stop, pollOnce, lastWebhookActive };
 }

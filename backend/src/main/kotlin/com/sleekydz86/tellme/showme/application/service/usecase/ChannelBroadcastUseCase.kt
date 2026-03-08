@@ -6,7 +6,6 @@ import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import lombok.RequiredArgsConstructor
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
-import java.io.ByteArrayInputStream
 
 @Service
 @RequiredArgsConstructor
@@ -29,18 +28,32 @@ class ChannelBroadcastUseCase(
             .onErrorResume { Mono.just(SendMessageResponse(STATUS_FAIL, null)) }
     }
 
-    fun sendPhoto(channelUsername: String?, bytes: ByteArray?, fileName: String?): Mono<SendMessageResponse> {
+    fun sendPhoto(channelUsername: String?, bytes: ByteArray?, fileName: String?, caption: String?): Mono<SendMessageResponse> {
         if (channelUsername.isNullOrBlank() || bytes == null || bytes.isEmpty()) {
             return Mono.just(SendMessageResponse(STATUS_FAIL, null))
         }
         val name = fileName?.takeIf { it.isNotBlank() } ?: "photo.jpg"
+        val cap = caption?.take(1024)?.takeIf { it.isNotBlank() }
         return telegramApi.sendPhotoToChannel(
             channelUsername,
-            null,
+            cap,
             name,
-            ByteArrayInputStream(bytes),
-            bytes.size.toLong()
+            bytes
         )!!
+            .map { res: TelegramSendResponse ->
+                if (res.ok == true) SendMessageResponse(STATUS_OK, null)
+                else SendMessageResponse(STATUS_FAIL, null)
+            }
+            .onErrorResume { Mono.just(SendMessageResponse(STATUS_FAIL, null)) }
+    }
+
+    fun sendDocument(channelUsername: String?, bytes: ByteArray?, fileName: String?, caption: String?): Mono<SendMessageResponse> {
+        if (channelUsername.isNullOrBlank() || bytes == null || bytes.isEmpty()) {
+            return Mono.just(SendMessageResponse(STATUS_FAIL, null))
+        }
+        val name = fileName?.takeIf { it.isNotBlank() } ?: "document"
+        val cap = caption?.take(1024)?.takeIf { it.isNotBlank() }
+        return telegramApi.sendDocumentToChannel(channelUsername, cap, name, bytes)!!
             .map { res: TelegramSendResponse ->
                 if (res.ok == true) SendMessageResponse(STATUS_OK, null)
                 else SendMessageResponse(STATUS_FAIL, null)

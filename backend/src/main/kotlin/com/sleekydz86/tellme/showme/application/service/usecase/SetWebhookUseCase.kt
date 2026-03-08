@@ -10,8 +10,8 @@ import reactor.core.publisher.Mono
 class SetWebhookUseCase(
     private val telegramApi: TelegramApiPort
 ) {
-    fun setWebhook(enabled: Boolean): Mono<TelegramSendResponse> {
-        return telegramApi.setWebhook(enabled)!!
+    fun setWebhook(enabled: Boolean, urlOverride: String? = null): Mono<TelegramSendResponse> {
+        return telegramApi.setWebhook(enabled, urlOverride)!!
             .onErrorResume { e -> Mono.just(errorResponse(e.message)) }
     }
 
