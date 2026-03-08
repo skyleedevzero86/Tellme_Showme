@@ -4,18 +4,18 @@ import com.sleekydz86.tellme.showme.application.port.ExternalContentPort
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.infrastructure.adapter.ExternalContentAdapterStub
 import com.sleekydz86.tellme.showme.infrastructure.adapter.TelegramApiPortStub
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Primary
 
 @Configuration
 class StubBeansConfig {
 
     @Bean
-    @Primary
+    @ConditionalOnMissingBean(TelegramApiPort::class)
     fun telegramApiPort(): TelegramApiPort = TelegramApiPortStub()
 
     @Bean
-    @Primary
+    @ConditionalOnMissingBean(ExternalContentPort::class)
     fun externalContentPort(): ExternalContentPort = ExternalContentAdapterStub()
 }

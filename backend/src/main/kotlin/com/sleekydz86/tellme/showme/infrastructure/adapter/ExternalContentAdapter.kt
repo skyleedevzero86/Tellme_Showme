@@ -3,7 +3,7 @@ package com.sleekydz86.tellme.showme.infrastructure.adapter
 import com.sleekydz86.tellme.global.config.TelegramBotProperties
 import com.sleekydz86.tellme.showme.application.port.ExternalContentPort
 import lombok.RequiredArgsConstructor
-import lombok.extern.slf4j.Slf4j
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 import java.io.BufferedReader
@@ -14,14 +14,14 @@ import java.nio.charset.StandardCharsets
 import java.util.stream.Collectors
 
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 class ExternalContentAdapter : ExternalContentPort {
+    private val log = LoggerFactory.getLogger(ExternalContentAdapter::class.java)
     private val objectMapper = ObjectMapper()
     private val properties: TelegramBotProperties? = null
 
-    val lottoNumbers: String?
+    override val lottoNumbers: String?
         get() {
             val numbers = IntArray(POOL_SIZE)
             for (i in numbers.indices) {
@@ -43,7 +43,7 @@ class ExternalContentAdapter : ExternalContentPort {
             return builder.toString()
         }
 
-    val bible: String?
+    override val bible: String?
         get() {
             val apiUrl = nullToEmpty(properties!!.bibleApiUrl)
             if (apiUrl.isBlank()) {
@@ -56,12 +56,12 @@ class ExternalContentAdapter : ExternalContentPort {
                     return root.get("saying_eng").asText() + "\n" + root.get("saying_kor").asText()
                 }
             } catch (e: Exception) {
-                ExternalContentAdapter.log.debug("Bible API error", e)
+                log.debug("Bible API error", e)
             }
             return ERROR_MESSAGE
         }
 
-    val english: String
+    override val english: String?
         get() {
             val apiUrl = nullToEmpty(properties!!.englishApiUrl)
             if (apiUrl.isBlank()) {
@@ -70,7 +70,7 @@ class ExternalContentAdapter : ExternalContentPort {
             try {
                 return fetchGet(apiUrl)
             } catch (e: Exception) {
-                ExternalContentAdapter.log.debug("English API error", e)
+                log.debug("English API error", e)
             }
             return ERROR_MESSAGE
         }

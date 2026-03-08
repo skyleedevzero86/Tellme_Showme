@@ -10,8 +10,8 @@ import org.springframework.web.reactive.function.client.WebClient
 @EnableConfigurationProperties(TelegramBotProperties::class)
 class TelegramBotConfig {
     @Bean
-    fun telegramWebClient(builder: WebClient.Builder, props: TelegramBotProperties): WebClient {
-        return builder
+    fun telegramWebClient(props: TelegramBotProperties): WebClient {
+        return WebClient.builder()
             .baseUrl(props.api.baseUrl)
             .build()
     }
