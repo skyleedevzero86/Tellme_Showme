@@ -2,6 +2,7 @@ HELP.md
 gradle/
 build.gradle.kts
 application.yml
+src/main/resources/application-local.yml
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
