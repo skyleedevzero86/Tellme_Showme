@@ -10,19 +10,19 @@ import java.nio.file.Path
 interface TelegramApiPort {
     val isTokenMissing: Boolean
 
-    fun setWebhook(enabled: Boolean): Mono<TelegramSendResponse?>?
+    fun setWebhook(enabled: Boolean): Mono<TelegramSendResponse>?
 
-    fun getUpdates(offset: Long?): Mono<TelegramUpdate?>?
+    fun getUpdates(offset: Long?): Mono<TelegramUpdate>?
 
-    fun getFile(fileId: String?): Mono<TelegramFileResponse?>?
+    fun getFile(fileId: String?): Mono<TelegramFileResponse>?
 
     fun getFileDownloadUri(filePath: String?): String?
 
-    fun downloadFileToLocal(fileId: String?, suggestedFileName: String?): Mono<Path?>?
+    fun downloadFileToLocal(fileId: String?, suggestedFileName: String?): Mono<Path>?
 
-    fun sendMessage(chatId: Long?, text: String?): Mono<TelegramSendResponse?>?
+    fun sendMessage(chatId: Long?, text: String?): Mono<TelegramSendResponse>?
 
-    fun sendMessageToChannel(channelIdOrUsername: String?, text: String?): Mono<TelegramSendResponse?>?
+    fun sendMessageToChannel(channelIdOrUsername: String?, text: String?): Mono<TelegramSendResponse>?
 
     fun sendDocument(
         chatId: Long?,
@@ -30,7 +30,7 @@ interface TelegramApiPort {
         fileName: String?,
         fileStream: InputStream?,
         fileLength: Long
-    ): Mono<TelegramSendResponse?>?
+    ): Mono<TelegramSendResponse>?
 
     fun sendPhoto(
         chatId: Long?,
@@ -38,10 +38,10 @@ interface TelegramApiPort {
         fileName: String?,
         photoStream: InputStream?,
         size: Long
-    ): Mono<TelegramSendResponse?>?
+    ): Mono<TelegramSendResponse>?
 
     fun sendPhotoToChannel(
         channelIdOrUsername: String?, caption: String?,
         fileName: String?, photoStream: InputStream?, size: Long
-    ): Mono<TelegramSendResponse?>?
+    ): Mono<TelegramSendResponse>?
 }
