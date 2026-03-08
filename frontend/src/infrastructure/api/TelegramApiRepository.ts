@@ -1,5 +1,6 @@
 import type {
   WebhookResponse,
+  WebhookInfoResponse,
   SendMessageResponse,
   GetUpdatesResponse,
 } from '@/domain/types/api';
@@ -17,11 +18,39 @@ const buildUrl = (path: string): string => {
 };
 
 export const telegramApiRepository = {
-  async setWebhook(enabled: boolean): Promise<WebhookResponse> {
-    const url = `${buildUrl(ENDPOINTS.WEBHOOK)}?enabled=${enabled}`;
-    const res = await fetch(url, { method: 'GET' });
+  async getWebhookStatus(): Promise<{ webhookUrlConfigured: boolean; webhookUrl: string }> {
+    const res = await fetch(buildUrl(ENDPOINTS.WEBHOOK_STATUS), { method: 'GET' });
     if (!res.ok) throw new Error(res.statusText);
     return res.json();
+  },
+
+  async setWebhook(enabled: boolean, webhookUrl?: string): Promise<WebhookResponse> {
+    const params = new URLSearchParams({ enabled: String(enabled) });
+    if (enabled && webhookUrl) params.set('url', webhookUrl);
+    const url = `${buildUrl(ENDPOINTS.WEBHOOK)}?${params.toString()}`;
+    const res = await fetch(url, { method: 'GET' });
+    if (!res.ok) throw new Error(res.statusText);
+    const data: WebhookResponse = await res.json();
+    if (data.ok === false && data.description) {
+      throw new Error(data.description);
+    }
+    return data;
+  },
+
+  async getWebhookInfo(): Promise<WebhookInfoResponse> {
+    const res = await fetch(buildUrl(ENDPOINTS.WEBHOOK_INFO), { method: 'GET' });
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  },
+
+  async deleteWebhook(): Promise<WebhookResponse> {
+    const res = await fetch(buildUrl(ENDPOINTS.WEBHOOK_DELETE), { method: 'GET' });
+    if (!res.ok) throw new Error(res.statusText);
+    const data: WebhookResponse = await res.json();
+    if (data.ok === false && data.description) {
+      throw new Error(data.description);
+    }
+    return data;
   },
 
   async getUpdates(): Promise<GetUpdatesResponse> {
@@ -43,10 +72,27 @@ export const telegramApiRepository = {
     return res.json();
   },
 
-  async uploadPhoto(file: File): Promise<SendMessageResponse> {
+  async uploadPhoto(file: File, caption?: string): Promise<SendMessageResponse> {
     const formData = new FormData();
     formData.append('filename', file);
+    if (caption != null && caption.trim() !== '') {
+      formData.append('caption', caption.trim().slice(0, 1024));
+    }
     const res = await fetch(buildUrl(ENDPOINTS.FILE_UPLOAD), {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  },
+
+  async uploadDocument(file: File, caption?: string): Promise<SendMessageResponse> {
+    const formData = new FormData();
+    formData.append('filename', file);
+    if (caption != null && caption.trim() !== '') {
+      formData.append('caption', caption.trim().slice(0, 1024));
+    }
+    const res = await fetch(buildUrl(ENDPOINTS.DOCUMENT_UPLOAD), {
       method: 'POST',
       body: formData,
     });
