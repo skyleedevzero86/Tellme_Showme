@@ -11,7 +11,6 @@ Tellme Showme는 [Telegram Bot API](https://core.telegram.org/bots/api)를 활�
 <br/>
 - **백엔드**: Java 21, Spring Boot 4.2, WebFlux(WebClient), gradle<br/>
 - **프론트엔드**: TypeScript, Next.js 16, React 18<br/>
->>>>>>>>> Temporary merge branch 2
 
 ---
 
