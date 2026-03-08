@@ -3,6 +3,7 @@ package com.sleekydz86.tellme.showme.application.port
 import com.sleekydz86.tellme.showme.domain.dto.TelegramFileResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramUpdate
+import com.sleekydz86.tellme.showme.domain.dto.WebhookInfoResponse
 import reactor.core.publisher.Mono
 import java.io.InputStream
 import java.nio.file.Path
@@ -10,7 +11,11 @@ import java.nio.file.Path
 interface TelegramApiPort {
     val isTokenMissing: Boolean
 
-    fun setWebhook(enabled: Boolean): Mono<TelegramSendResponse>?
+    fun setWebhook(enabled: Boolean, urlOverride: String? = null): Mono<TelegramSendResponse>?
+
+    fun getWebhookInfo(): Mono<WebhookInfoResponse>?
+
+    fun deleteWebhook(): Mono<TelegramSendResponse>?
 
     fun getUpdates(offset: Long?): Mono<TelegramUpdate>?
 

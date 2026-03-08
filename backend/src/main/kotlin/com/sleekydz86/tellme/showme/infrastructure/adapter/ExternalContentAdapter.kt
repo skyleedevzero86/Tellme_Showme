@@ -2,7 +2,6 @@ package com.sleekydz86.tellme.showme.infrastructure.adapter
 
 import com.sleekydz86.tellme.global.config.TelegramBotProperties
 import com.sleekydz86.tellme.showme.application.port.ExternalContentPort
-import lombok.RequiredArgsConstructor
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
@@ -15,65 +14,71 @@ import java.util.stream.Collectors
 
 
 @Component
-@RequiredArgsConstructor
-class ExternalContentAdapter : ExternalContentPort {
+class ExternalContentAdapter(
+    private val properties: TelegramBotProperties
+) : ExternalContentPort {
     private val log = LoggerFactory.getLogger(ExternalContentAdapter::class.java)
     private val objectMapper = ObjectMapper()
-    private val properties: TelegramBotProperties? = null
 
     override val lottoNumbers: String?
-        get() {
-            val numbers = IntArray(POOL_SIZE)
-            for (i in numbers.indices) {
-                numbers[i] = i + 1
-            }
-            for (i in 0..<SHUFFLE_ROUNDS) {
-                val pick = (Math.random() * POOL_SIZE).toInt()
-                val temp = numbers[0]
-                numbers[0] = numbers[pick]
-                numbers[pick] = temp
-            }
-            val builder = StringBuilder()
-            for (i in 0..<PICK_COUNT) {
-                if (i > 0) {
-                    builder.append(", ")
-                }
-                builder.append(numbers[i])
-            }
-            return builder.toString()
-        }
+        get() = computeLottoNumbers()
 
     override val bible: String?
-        get() {
-            val apiUrl = nullToEmpty(properties!!.bibleApiUrl)
-            if (apiUrl.isBlank()) {
-                return BIBLE_PLACEHOLDER
-            }
-            try {
-                val body = fetchGet(apiUrl)
-                val root = objectMapper.readTree(body)
-                if (root != null && root.has("saying_eng") && root.has("saying_kor")) {
-                    return root.get("saying_eng").asText() + "\n" + root.get("saying_kor").asText()
-                }
-            } catch (e: Exception) {
-                log.debug("Bible API error", e)
-            }
-            return ERROR_MESSAGE
-        }
+        get() = fetchBible()
 
     override val english: String?
-        get() {
-            val apiUrl = nullToEmpty(properties!!.englishApiUrl)
-            if (apiUrl.isBlank()) {
-                return ENGLISH_PLACEHOLDER
-            }
-            try {
-                return fetchGet(apiUrl)
-            } catch (e: Exception) {
-                log.debug("English API error", e)
-            }
-            return ERROR_MESSAGE
+        get() = fetchEnglish()
+
+    private fun computeLottoNumbers(): String {
+        val numbers = IntArray(POOL_SIZE)
+        for (i in numbers.indices) {
+            numbers[i] = i + 1
         }
+        for (i in 0..<SHUFFLE_ROUNDS) {
+            val pick = (Math.random() * POOL_SIZE).toInt()
+            val temp = numbers[0]
+            numbers[0] = numbers[pick]
+            numbers[pick] = temp
+        }
+        val builder = StringBuilder()
+        for (i in 0..<PICK_COUNT) {
+            if (i > 0) {
+                builder.append(", ")
+            }
+            builder.append(numbers[i])
+        }
+        return builder.toString()
+    }
+
+    private fun fetchBible(): String? {
+        val apiUrl = nullToEmpty(properties.bibleApiUrl)
+        if (apiUrl.isBlank()) {
+            return BIBLE_PLACEHOLDER
+        }
+        try {
+            val body = fetchGet(apiUrl)
+            val root = objectMapper.readTree(body)
+            if (root != null && root.has("saying_eng") && root.has("saying_kor")) {
+                return root.get("saying_eng").asText() + "\n" + root.get("saying_kor").asText()
+            }
+        } catch (e: Exception) {
+            log.debug("Bible API error", e)
+        }
+        return ERROR_MESSAGE
+    }
+
+    private fun fetchEnglish(): String? {
+        val apiUrl = nullToEmpty(properties.englishApiUrl)
+        if (apiUrl.isBlank()) {
+            return ENGLISH_PLACEHOLDER
+        }
+        try {
+            return fetchGet(apiUrl)
+        } catch (e: Exception) {
+            log.debug("English API error", e)
+        }
+        return ERROR_MESSAGE
+    }
 
     @Throws(Exception::class)
     private fun fetchGet(urlString: String): String {

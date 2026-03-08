@@ -5,9 +5,11 @@ import com.sleekydz86.tellme.showme.application.service.HandleUpdateService
 import com.sleekydz86.tellme.showme.application.service.usecase.ChannelBroadcastUseCase
 import com.sleekydz86.tellme.showme.application.service.usecase.PollUpdatesUseCase
 import com.sleekydz86.tellme.showme.application.service.usecase.SetWebhookUseCase
+import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.domain.dto.SendMessageResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.WebhookUpdate
+import com.sleekydz86.tellme.showme.domain.dto.WebhookInfoResponse
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -18,6 +20,7 @@ import reactor.core.publisher.Mono
 @RestController
 class WebHookController(
     private val setWebhookUseCase: SetWebhookUseCase,
+    private val telegramApi: TelegramApiPort,
     private val handleUpdateService: HandleUpdateService,
     private val pollUpdatesUseCase: PollUpdatesUseCase,
     private val channelBroadcastUseCase: ChannelBroadcastUseCase,
@@ -25,9 +28,41 @@ class WebHookController(
 ) {
     private val log = LoggerFactory.getLogger(WebHookController::class.java)
 
+    @GetMapping(value = ["/webhook_status.do"], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun webhookStatus(): ResponseEntity<Map<String, Any>> {
+        val url = properties.api.webhookUrl
+        val configured = url.isNotBlank()
+        return ResponseEntity.ok(mapOf(
+            "webhookUrlConfigured" to configured,
+            "webhookUrl" to (url.ifBlank { "" })
+        ))
+    }
+
+    @GetMapping(value = ["/webhook_info.do"], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun webhookInfo(): Mono<ResponseEntity<WebhookInfoResponse>> {
+        return (telegramApi.getWebhookInfo() ?: Mono.empty())
+            .map { ResponseEntity.ok(it) }
+            .defaultIfEmpty(ResponseEntity.ok(WebhookInfoResponse(ok = false, result = null)))
+    }
+
+    @GetMapping(value = ["/webhook_delete.do"], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun deleteWebhook(): Mono<ResponseEntity<TelegramSendResponse>> {
+        return (telegramApi.deleteWebhook() ?: Mono.empty())
+            .map { ResponseEntity.ok(it) }
+            .defaultIfEmpty(ResponseEntity.ok(TelegramSendResponse(ok = false, description = "Not available", result = null)))
+    }
+
+    @GetMapping(value = ["/callback.do"], produces = [MediaType.TEXT_PLAIN_VALUE])
+    fun callbackGet(): ResponseEntity<String> {
+        return ResponseEntity.ok("OK")
+    }
+
     @GetMapping(value = ["/webHook.do"], produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun setWebHook(@RequestParam("enabled") enabled: Boolean): Mono<ResponseEntity<TelegramSendResponse>> {
-        return setWebhookUseCase.setWebhook(enabled)
+    fun setWebHook(
+        @RequestParam("enabled") enabled: Boolean,
+        @RequestParam("url", required = false) url: String?
+    ): Mono<ResponseEntity<TelegramSendResponse>> {
+        return setWebhookUseCase.setWebhook(enabled, url)
             .map { ResponseEntity.ok(it) }
     }
 
@@ -67,9 +102,10 @@ class WebHookController(
             .map { ResponseEntity.ok(it) }
     }
 
-    @PostMapping(value = ["/callback.do"], consumes = [MediaType.APPLICATION_JSON_VALUE])
-    fun callback(@RequestBody update: WebhookUpdate?): Mono<ResponseEntity<Void>> {
-        val ok = ResponseEntity.ok().build<Void>()
+    @PostMapping(value = ["/callback.do"], produces = [MediaType.TEXT_PLAIN_VALUE])
+    fun callback(@RequestBody(required = false) update: WebhookUpdate?): Mono<ResponseEntity<String>> {
+        log.info("Webhook callback received: update_id={}, message.text={}", update?.updateId, update?.message?.text)
+        val ok = ResponseEntity.ok("ok")
         if (update == null || update.message == null) {
             return Mono.just(ok)
         }

@@ -4,6 +4,7 @@ import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.application.service.HandleUpdateService
 import com.sleekydz86.tellme.showme.domain.dto.TelegramUpdate
 import org.slf4j.LoggerFactory
+import org.springframework.web.reactive.function.client.WebClientResponseException
 import tools.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import java.util.concurrent.atomic.AtomicLong
@@ -18,9 +19,13 @@ class PollUpdatesUseCase(
     private val lastUpdateId = AtomicLong(0)
     private val objectMapper = ObjectMapper()
 
-    fun pollAndProcess(): java.lang.String? {
+    fun pollAndProcess(): String? {
         if (telegramApi.isTokenMissing) {
             return jsonResult("봇 토큰이 설정되지 않았습니다.")
+        }
+        val webhookUrl = telegramApi.getWebhookInfo()?.block()?.result?.url?.takeIf { it.isNotBlank() }
+        if (webhookUrl != null) {
+            return jsonResultWebhookActive()
         }
         var result = jsonResult("신규 메시지 없음")
         for (i in 0..<MAX_ATTEMPTS) {
@@ -29,6 +34,9 @@ class PollUpdatesUseCase(
             try {
                 update = telegramApi.getUpdates(offset)?.block()
             } catch (e: Exception) {
+                if (e is WebClientResponseException && e.statusCode.value() == 409) {
+                    return jsonResultWebhookActive()
+                }
                 log.warn("getUpdates error", e)
                 return jsonResult("오류")
             }
@@ -69,11 +77,24 @@ class PollUpdatesUseCase(
         }
     }
 
-    private fun jsonResult(message: String?): java.lang.String? {
+    private fun jsonResult(message: String?): String? {
         return try {
-            objectMapper.writeValueAsString(mapOf<String, String>("result" to (message ?: ""))) as java.lang.String?
+            objectMapper.writeValueAsString(mapOf<String, String>("result" to (message ?: "")))
         } catch (e: tools.jackson.core.JacksonException) {
-            ERROR_JSON as java.lang.String
+            ERROR_JSON
+        }
+    }
+
+    private fun jsonResultWebhookActive(): String {
+        return try {
+            objectMapper.writeValueAsString(
+                mapOf(
+                    "result" to WEBHOOK_ACTIVE_MESSAGE,
+                    "webhookActive" to true
+                )
+            )
+        } catch (e: tools.jackson.core.JacksonException) {
+            ERROR_JSON
         }
     }
 
@@ -81,5 +102,6 @@ class PollUpdatesUseCase(
         private const val MAX_ATTEMPTS = 10
         private const val SLEEP_MS = 5000
         private const val ERROR_JSON = "{\"result\" : \"오류\"}"
+        private const val WEBHOOK_ACTIVE_MESSAGE = "웹후크 사용 중에는 getUpdates(폴링)를 사용할 수 없습니다. 웹후크 페이지에서 삭제 후 이용하세요."
     }
 }

@@ -5,6 +5,7 @@ import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.domain.dto.TelegramFileResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramUpdate
+import com.sleekydz86.tellme.showme.domain.dto.WebhookInfoResponse
 import org.slf4j.LoggerFactory
 import org.springframework.core.io.InputStreamResource
 import org.springframework.http.MediaType
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.core.publisher.Mono
 import java.io.IOException
 import java.io.InputStream
@@ -39,17 +41,52 @@ class TelegramWebClientAdapter(
             return t.isBlank()
         }
 
-    override fun setWebhook(enabled: Boolean): Mono<TelegramSendResponse>? {
+    override fun setWebhook(enabled: Boolean, urlOverride: String?): Mono<TelegramSendResponse>? {
         var path = "/bot" + botToken() + "/setWebhook"
         if (enabled) {
-            val webhookUrl = properties.api.webhookUrl
-            if (webhookUrl.isBlank()) {
-                return Mono.error(IllegalStateException("telegram.api.webhook-url 이 설정되지 않았습니다."))
+            var webhookUrl = (urlOverride?.trim() ?: properties.api.webhookUrl.trim()).ifBlank { null }
+                ?: return Mono.error(IllegalStateException("웹후크 URL을 입력하세요. ngrok 실행 후 나온 주소 (예: https://xxxx.ngrok-free.app)"))
+            if (!webhookUrl.startsWith("https://") || webhookUrl.contains("your-public-https-url")) {
+                return Mono.error(IllegalStateException("웹후크 URL은 HTTPS 주소여야 합니다. (예: https://xxxx.ngrok-free.app)"))
             }
+            if (!webhookUrl.endsWith("/callback.do")) {
+                webhookUrl = webhookUrl.trimEnd('/') + "/callback.do"
+            }
+            log.info("setWebhook 요청 URL: {}", webhookUrl)
             path += "?url=" + URLEncoder.encode(webhookUrl, StandardCharsets.UTF_8)
         } else {
             path += "?url="
         }
+        return telegramWebClient.get()
+            .uri(path)
+            .retrieve()
+            .bodyToMono(TelegramSendResponse::class.java)
+            .onErrorMap(WebClientResponseException::class.java) { ex ->
+                if (ex.statusCode.value() == 400) {
+                    val body = ex.responseBodyAsString
+                    val hint = when {
+                        body.contains("Failed to resolve host", ignoreCase = true) || body.contains("Name or service not known", ignoreCase = true) ->
+                            "Telegram이 호스트를 찾지 못했습니다. Spring 로그에서 'setWebhook 요청 URL:' 로 전송한 주소를 확인하세요. 주소가 정확한지, 앞뒤 공백/줄바꿈이 없는지 확인하고, 브라우저에서 그 주소가 열리는지 확인하세요."
+                        body.isNotBlank() -> body
+                        else -> "HTTPS이고 외부에서 접속 가능한 URL인지 확인하세요."
+                    }
+                    IllegalStateException("Telegram 웹후크 거부(400): $hint")
+                } else {
+                    ex
+                }
+            }
+    }
+
+    override fun getWebhookInfo(): Mono<WebhookInfoResponse>? {
+        val path = "/bot" + botToken() + "/getWebhookInfo"
+        return telegramWebClient.get()
+            .uri(path)
+            .retrieve()
+            .bodyToMono(WebhookInfoResponse::class.java)
+    }
+
+    override fun deleteWebhook(): Mono<TelegramSendResponse>? {
+        val path = "/bot" + botToken() + "/deleteWebhook"
         return telegramWebClient.get()
             .uri(path)
             .retrieve()

@@ -4,6 +4,7 @@ import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.domain.dto.TelegramFileResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramUpdate
+import com.sleekydz86.tellme.showme.domain.dto.WebhookInfoResponse
 import reactor.core.publisher.Mono
 import java.io.InputStream
 import java.nio.file.Path
@@ -12,8 +13,14 @@ class TelegramApiPortStub : TelegramApiPort {
 
     override val isTokenMissing: Boolean = true
 
-    override fun setWebhook(enabled: Boolean): Mono<TelegramSendResponse> =
+    override fun setWebhook(enabled: Boolean, urlOverride: String?): Mono<TelegramSendResponse> =
         Mono.just(TelegramSendResponse(ok = true, description = "stub", result = null))
+
+    override fun getWebhookInfo(): Mono<WebhookInfoResponse> =
+        Mono.just(WebhookInfoResponse(ok = true, result = null))
+
+    override fun deleteWebhook(): Mono<TelegramSendResponse> =
+        Mono.just(TelegramSendResponse(ok = true, description = "Webhook is already deleted", result = true))
 
     override fun getUpdates(offset: Long?): Mono<TelegramUpdate> =
         Mono.just(TelegramUpdate())

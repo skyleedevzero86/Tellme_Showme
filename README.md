@@ -3,10 +3,12 @@
 **Telegram Bot 관리·운영 플랫폼** — 웹후크/롱폴링 수신, 채널 브로드캐스트, 명령 처리(로또·성경·영어·검색 등)를 하나의 풀스택으로 제공합니다.<br/>
 
 ---
+
 <img width="1408" height="768" alt="image" src="https://github.com/user-attachments/assets/43f1512c-c3b6-4f83-94fb-702bd9ae4046" />
 <br/>
 
 ## 프로젝트 소개<br/>
+
 <br/>
 Tellme Showme는 [Telegram Bot API](https://core.telegram.org/bots/api)를 활용한 **풀스택 봇 운영 플랫폼**입니다.  <br/>
 백엔드는 **Spring Boot 4.x** 로 유스케이스·포트·어댑터를 명확히 나누었고, 프론트엔드는 **Next.js 14(App Router) 스타일 레이어**로 구성했습니다.  <br/>
