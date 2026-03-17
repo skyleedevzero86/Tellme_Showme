@@ -6,6 +6,7 @@ import com.sleekydz86.tellme.showme.application.service.usecase.ChannelBroadcast
 import com.sleekydz86.tellme.showme.application.service.usecase.PollUpdatesUseCase
 import com.sleekydz86.tellme.showme.application.service.usecase.SetWebhookUseCase
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
+import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
 import com.sleekydz86.tellme.showme.domain.dto.SendMessageResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.WebhookUpdate
@@ -24,6 +25,7 @@ class WebHookController(
     private val handleUpdateService: HandleUpdateService,
     private val pollUpdatesUseCase: PollUpdatesUseCase,
     private val channelBroadcastUseCase: ChannelBroadcastUseCase,
+    private val aiServerUpload: AiServerUploadPort,
     private val properties: TelegramBotProperties
 ) {
     private val log = LoggerFactory.getLogger(WebHookController::class.java)
@@ -101,7 +103,11 @@ class WebHookController(
             log.warn("file_upload read error", e)
             return Mono.just(ResponseEntity.ok().body(SendMessageResponse("fail", null)))
         }
-        return channelBroadcastUseCase.sendPhoto(channel, bytes, fileName, caption)
+        return aiServerUpload.upload(bytes, fileName, file.contentType, "frontend", "FRONTEND")
+            .flatMap { ok ->
+                if (ok) channelBroadcastUseCase.sendPhoto(channel, bytes, fileName, caption)
+                else Mono.just(SendMessageResponse("fail", null))
+            }
             .map { ResponseEntity.ok(it) }
     }
 
@@ -126,7 +132,11 @@ class WebHookController(
             log.warn("document_upload read error", e)
             return Mono.just(ResponseEntity.ok().body(SendMessageResponse("fail", null)))
         }
-        return channelBroadcastUseCase.sendDocument(channel, bytes, fileName, caption)
+        return aiServerUpload.upload(bytes, fileName, file.contentType, "frontend", "FRONTEND")
+            .flatMap { ok ->
+                if (ok) channelBroadcastUseCase.sendDocument(channel, bytes, fileName, caption)
+                else Mono.just(SendMessageResponse("fail", null))
+            }
             .map { ResponseEntity.ok(it) }
     }
 

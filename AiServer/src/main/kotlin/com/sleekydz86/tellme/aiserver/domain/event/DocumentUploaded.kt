@@ -7,5 +7,6 @@ data class DocumentUploaded(
     val userId: String,
     val objectKey: String,
     val contentType: String,
+    val uploadSource: String,
     val timestamp: Instant = Instant.now()
 ) : DomainEvent

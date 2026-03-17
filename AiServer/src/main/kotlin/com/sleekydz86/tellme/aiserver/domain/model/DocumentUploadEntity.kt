@@ -19,6 +19,8 @@ class DocumentUploadEntity(
     val contentType: String,
     @Column(length = 500)
     val encryptionIv: String? = null,
+    @Column(nullable = false, length = 32)
+    val uploadSource: String = "FRONTEND",
     @Column(nullable = false)
     var usageCount: Long = 0L,
     @Column

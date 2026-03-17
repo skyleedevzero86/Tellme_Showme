@@ -23,9 +23,14 @@ class RagController(
     @PostMapping("/upload")
     fun upload(
         @RequestParam("file") file: MultipartFile,
-        @RequestHeader("X-User-Id", required = false) userId: String?
+        @RequestHeader("X-User-Id", required = false) userId: String?,
+        @RequestHeader("X-Upload-Source", required = false) uploadSource: String?
     ): LeeResult<Nothing> {
         val uid = userId ?: "익명"
+        val source = when (uploadSource?.uppercase()) {
+            "TELEGRAM" -> "TELEGRAM"
+            else -> "FRONTEND"
+        }
         if (file.isEmpty) return LeeResult.error("유효하지 않은 파일입니다.")
         val fileName = file.originalFilename ?: "알 수 없음"
 
@@ -38,7 +43,8 @@ class RagController(
                             fileName = fileName,
                             userId = uid,
                             objectKey = objectKey,
-                            contentType = file.contentType ?: "application/octet-stream"
+                            contentType = file.contentType ?: "application/octet-stream",
+                            uploadSource = source
                         )
                     )
                     LeeResult.ok(msg = "파일이 성공적으로 업로드되었습니다.")

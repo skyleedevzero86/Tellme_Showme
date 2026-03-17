@@ -1,6 +1,7 @@
 package com.sleekydz86.tellme.showme.application.service
 
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
+import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
 import com.sleekydz86.tellme.showme.application.service.handler.*
 import com.sleekydz86.tellme.showme.domain.BotCommand
 import com.sleekydz86.tellme.showme.domain.MessageContext
@@ -9,12 +10,14 @@ import com.sleekydz86.tellme.showme.domain.dto.TelegramUpdate
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
+import java.nio.file.Files
 import java.nio.file.Path
 
 
 @Service
 class HandleUpdateService(
     private val telegramApi: TelegramApiPort,
+    private val aiServerUpload: AiServerUploadPort,
     startHandler: StartCommandHandler?,
     timeHandler: TimeCommandHandler?,
     helpHandler: HelpCommandHandler?,
@@ -85,7 +88,20 @@ class HandleUpdateService(
         )
 
         return telegramApi.downloadFileToLocal(fileId, fileName)!!
-            .flatMap { localPath -> telegramApi.sendMessage(chatId, "파일을 받았습니다.\n이름: $fileName\n크기: ${doc.fileSize} bytes\n로컬 저장: $localPath")!! }
+            .flatMap { localPath ->
+                val bytes = try {
+                    Files.readAllBytes(localPath)
+                } catch (e: Exception) {
+                    log.warn("document read error", e)
+                    return@flatMap telegramApi.sendMessage(chatId, "파일 읽기 오류: ${e.message}")!!.then()
+                }
+                aiServerUpload.upload(bytes, fileName, null, chatId.toString(), "TELEGRAM")
+                    .flatMap { ok ->
+                        val msg = if (ok) "파일을 받았습니다. (MinIO 저장)\n이름: $fileName\n크기: ${doc.fileSize} bytes"
+                        else "파일 저장 중 오류가 발생했습니다."
+                        telegramApi.sendMessage(chatId, msg)!!
+                    }
+            }
             .onErrorResume { e -> telegramApi.sendMessage(chatId, "파일 저장 중 오류: ${e.message}")!! }
             .then()
     }
@@ -94,10 +110,24 @@ class HandleUpdateService(
         val photoList = message.photo!!
         val largest = photoList[photoList.size - 1]!!
         val fileId = largest.fileId
+        val fileName = "photo_${largest.fileUniqueId}.jpg"
         log.info("Photo received: fileId={}", fileId)
 
-        return telegramApi.downloadFileToLocal(fileId, "photo_${largest.fileUniqueId}.jpg")!!
-            .flatMap { localPath -> telegramApi.sendMessage(chatId, "사진을 받았습니다. (해상도 ${largest.width}x${largest.height})\n저장: $localPath")!! }
+        return telegramApi.downloadFileToLocal(fileId, fileName)!!
+            .flatMap { localPath ->
+                val bytes = try {
+                    Files.readAllBytes(localPath)
+                } catch (e: Exception) {
+                    log.warn("photo read error", e)
+                    return@flatMap telegramApi.sendMessage(chatId, "사진 읽기 오류: ${e.message}")!!.then()
+                }
+                aiServerUpload.upload(bytes, fileName, "image/jpeg", chatId.toString(), "TELEGRAM")
+                    .flatMap { ok ->
+                        val msg = if (ok) "사진을 받았습니다. (MinIO 저장) 해상도 ${largest.width}x${largest.height}"
+                        else "사진 저장 중 오류가 발생했습니다."
+                        telegramApi.sendMessage(chatId, msg)!!
+                    }
+            }
             .onErrorResume { e -> telegramApi.sendMessage(chatId, "사진 저장 중 오류: ${e.message}")!! }
             .then()
     }
