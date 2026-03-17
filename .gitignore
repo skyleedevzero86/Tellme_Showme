@@ -1,3 +1,11 @@
+AiServer/.gradle/
+AiServer/.idea/
+AiServer/build/
+Aiserver/bin/
+Aiserver/gradle/
+Aiserver/Help.md
+Aiserver/build.gradle.kts
+Aiserver/src/main/resources/application.yml
 # Compiled class file
 *.class
 
