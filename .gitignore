@@ -6,6 +6,7 @@ Aiserver/gradle/
 Aiserver/Help.md
 Aiserver/build.gradle.kts
 Aiserver/src/main/resources/application.yml
+Aiserver/out/
 # Compiled class file
 *.class
 

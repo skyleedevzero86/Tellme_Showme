@@ -14,21 +14,20 @@ class RedisSessionAdapter(
     }
 
     override fun set(sessionId: String, field: String, value: String) {
-        redisTemplate.opsForHash().put(SESSION_PREFIX + sessionId, field, value)
+        redisTemplate.opsForHash<String, String>().put(sessionKey(sessionId), field, value)
     }
 
     override fun get(sessionId: String, field: String): String? {
-        val v = redisTemplate.opsForHash().get(SESSION_PREFIX + sessionId, field) ?: return null
-        return v as? String
+        return redisTemplate.opsForHash<String, String>().get(sessionKey(sessionId), field)
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun getAll(sessionId: String): Map<String, String> {
-        val entries = redisTemplate.opsForHash().entries(SESSION_PREFIX + sessionId) ?: return emptyMap()
-        return entries.entries.associate { it.key.toString() to (it.value as? String ?: it.value.toString()) }
+        return redisTemplate.opsForHash<String, String>().entries(sessionKey(sessionId))
     }
 
     override fun delete(sessionId: String) {
-        redisTemplate.delete(SESSION_PREFIX + sessionId)
+        redisTemplate.delete(sessionKey(sessionId))
     }
+
+    private fun sessionKey(sessionId: String): String = SESSION_PREFIX + sessionId
 }

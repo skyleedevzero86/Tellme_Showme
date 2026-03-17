@@ -25,9 +25,9 @@ class RagController(
         @RequestParam("file") file: MultipartFile,
         @RequestHeader("X-User-Id", required = false) userId: String?
     ): LeeResult<Nothing> {
-        val uid = userId ?: "anonymous"
+        val uid = userId ?: "익명"
         if (file.isEmpty) return LeeResult.error("유효하지 않은 파일입니다.")
-        val fileName = file.originalFilename ?: "unknown"
+        val fileName = file.originalFilename ?: "알 수 없음"
 
         return try {
             val objectKey = storagePort.save(file, uid)

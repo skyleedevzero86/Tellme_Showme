@@ -47,7 +47,7 @@ class MinioStorageAdapter(
     }
 
     override fun save(file: MultipartFile, userId: String): String {
-        val objectKey = "uploads/$userId/${UUID.randomUUID()}_${file.originalFilename ?: "file"}"
+        val objectKey = "uploads/$userId/${UUID.randomUUID()}_${file.originalFilename ?: "파일"}"
         val bytes = file.inputStream.readAllBytes()
         val (encrypted, ivBase64) = encryptionPort.encryptBytes(bytes)
         minioClient.putObject(

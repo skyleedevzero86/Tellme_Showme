@@ -1,5 +1,6 @@
 package com.sleekydz86.tellme.aiserver.infrastructure.sse
 
+import com.sleekydz86.tellme.aiserver.aplication.event.DomainEventPublisher
 import com.sleekydz86.tellme.aiserver.aplication.port.SSEPort
 import com.sleekydz86.tellme.aiserver.domain.event.SseConnected
 import com.sleekydz86.tellme.aiserver.domain.event.SseDisconnected
@@ -28,10 +29,10 @@ class RedisBasedSSEServer(
     override fun addConnection(userId: String, emitter: SseEmitter) {
         connections[userId] = emitter
         redisTemplate.opsForValue().set("sse:connection:$userId", "connected", java.time.Duration.ofMinutes(30))
-        sendMsg(userId, "connected", SSEMsgType.ADD.name)
+        sendMsg(userId, "연결됨", SSEMsgType.ADD.name)
         setupUserChannel(userId)
         domainEventPublisher.publish(SseConnected(userId))
-        logger.info("SSE 연결 추가: userId={}, total={}", userId, connections.size)
+        logger.info("SSE 연결 추가됨: userId={}, total={}", userId, connections.size)
     }
 
     override fun sendMsg(userId: String, message: String, type: String) {
@@ -55,7 +56,7 @@ class RedisBasedSSEServer(
                 emitter.complete()
                 redisTemplate.delete("sse:connection:$userId")
                 domainEventPublisher.publish(SseDisconnected(userId))
-                logger.info("SSE 연결 종료: userId={}", userId)
+                logger.info("SSE 연결 종료됨: userId={}", userId)
             } catch (e: Exception) {
                 logger.error("SSE 종료 실패: userId={}", userId, e)
             }
