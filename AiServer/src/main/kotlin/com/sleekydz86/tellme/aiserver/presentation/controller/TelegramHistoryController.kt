@@ -7,6 +7,7 @@ import com.sleekydz86.tellme.aiserver.infrastructure.persistence.TelegramMessage
 import com.sleekydz86.tellme.aiserver.presentation.dto.LeeResult
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.time.Instant
@@ -15,7 +16,8 @@ import java.time.Instant
 @RequestMapping("/api/telegram")
 class TelegramHistoryController(
     private val telegramMessageRepository: TelegramMessageRepository,
-    private val documentUploadRepository: DocumentUploadRepository
+    private val documentUploadRepository: DocumentUploadRepository,
+    private val jdbcTemplate: JdbcTemplate
 ) {
 
     @PostMapping("/messages")
@@ -41,34 +43,78 @@ class TelegramHistoryController(
         @RequestParam(defaultValue = "20") size: Int,
         @RequestParam(required = false) search: String?
     ): ResponseEntity<LeeResult<MessageHistoryResponse>> {
-        val pageable = PageRequest.of(
-            page.coerceAtLeast(0),
-            size.coerceIn(1, 100),
-            Sort.by(Sort.Direction.DESC, "receivedAt")
-        )
-        val result = if (search.isNullOrBlank()) {
-            telegramMessageRepository.findAll(pageable)
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, 100)
+        val offset = safePage * safeSize
+        val searchTerm = search?.trim()?.takeIf { it.isNotEmpty() }
+
+        val items = if (searchTerm == null) {
+            jdbcTemplate.query(
+                """
+                    SELECT id, telegram_message_id, chat_id, from_user_id, from_user_name, text, received_at, created_at
+                    FROM telegram_messages
+                    ORDER BY received_at DESC
+                    LIMIT ? OFFSET ?
+                """.trimIndent(),
+                { rs, _ ->
+                    MessageHistoryItem(
+                        id = rs.getLong("id"),
+                        telegramMessageId = rs.getLong("telegram_message_id"),
+                        chatId = rs.getString("chat_id"),
+                        fromUserId = rs.getString("from_user_id"),
+                        fromUserName = rs.getString("from_user_name"),
+                        text = rs.getString("text"),
+                        receivedAt = rs.getObject("received_at").toString(),
+                        createdAt = rs.getObject("created_at").toString()
+                    )
+                },
+                safeSize,
+                offset
+            )
         } else {
-            telegramMessageRepository.findByTextContainingIgnoreCase(search.trim(), pageable)
-        }
-        val items = result.content.map { msg ->
-            MessageHistoryItem(
-                id = msg.id!!,
-                telegramMessageId = msg.telegramMessageId,
-                chatId = msg.chatId,
-                fromUserId = msg.fromUserId,
-                fromUserName = msg.fromUserName,
-                text = msg.text,
-                receivedAt = msg.receivedAt.toString(),
-                createdAt = msg.createdAt.toString()
+            jdbcTemplate.query(
+                """
+                    SELECT id, telegram_message_id, chat_id, from_user_id, from_user_name, text, received_at, created_at
+                    FROM telegram_messages
+                    WHERE COALESCE(text, '') ILIKE ?
+                    ORDER BY received_at DESC
+                    LIMIT ? OFFSET ?
+                """.trimIndent(),
+                { rs, _ ->
+                    MessageHistoryItem(
+                        id = rs.getLong("id"),
+                        telegramMessageId = rs.getLong("telegram_message_id"),
+                        chatId = rs.getString("chat_id"),
+                        fromUserId = rs.getString("from_user_id"),
+                        fromUserName = rs.getString("from_user_name"),
+                        text = rs.getString("text"),
+                        receivedAt = rs.getObject("received_at").toString(),
+                        createdAt = rs.getObject("created_at").toString()
+                    )
+                },
+                "%$searchTerm%",
+                safeSize,
+                offset
             )
         }
+
+        val totalElements = if (searchTerm == null) {
+            jdbcTemplate.queryForObject("SELECT COUNT(*) FROM telegram_messages", Long::class.java) ?: 0L
+        } else {
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM telegram_messages WHERE COALESCE(text, '') ILIKE ?",
+                Long::class.java,
+                "%$searchTerm%"
+            ) ?: 0L
+        }
+        val totalPages = if (totalElements == 0L) 0 else ((totalElements + safeSize - 1) / safeSize).toInt()
+
         val response = MessageHistoryResponse(
             content = items,
-            totalElements = result.totalElements,
-            totalPages = result.totalPages,
-            number = result.number,
-            size = result.size
+            totalElements = totalElements,
+            totalPages = totalPages,
+            number = safePage,
+            size = safeSize
         )
         return ResponseEntity.ok(LeeResult.ok(data = response))
     }
@@ -79,39 +125,90 @@ class TelegramHistoryController(
         @RequestParam(defaultValue = "20") size: Int,
         @RequestParam(required = false) search: String?
     ): ResponseEntity<LeeResult<FileHistoryResponse>> {
-        val pageable = PageRequest.of(
-            page.coerceAtLeast(0),
-            size.coerceIn(1, 100),
-            Sort.by(Sort.Direction.DESC, "createdAt")
-        )
-        val result = if (search.isNullOrBlank()) {
-            documentUploadRepository.findByUploadSource("TELEGRAM", pageable)
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, 100)
+        val offset = safePage * safeSize
+        val searchTerm = search?.trim()?.takeIf { it.isNotEmpty() }
+
+        val items = if (searchTerm == null) {
+            jdbcTemplate.query(
+                """
+                    SELECT id, file_name, object_key, content_type, user_id, from_user_name, telegram_message_id, upload_source, created_at
+                    FROM document_uploads
+                    WHERE upload_source = 'TELEGRAM'
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """.trimIndent(),
+                { rs, _ ->
+                    FileHistoryItem(
+                        id = rs.getLong("id"),
+                        fileName = rs.getString("file_name"),
+                        objectKey = rs.getString("object_key"),
+                        contentType = rs.getString("content_type"),
+                        userId = rs.getString("user_id"),
+                        fromUserName = rs.getString("from_user_name"),
+                        telegramMessageId = rs.getObject("telegram_message_id") as? Long,
+                        uploadSource = rs.getString("upload_source"),
+                        createdAt = rs.getObject("created_at").toString()
+                    )
+                },
+                safeSize,
+                offset
+            )
         } else {
-            documentUploadRepository.findByUploadSourceAndFileNameContainingIgnoreCase(
-                "TELEGRAM",
-                search.trim(),
-                pageable
+            jdbcTemplate.query(
+                """
+                    SELECT id, file_name, object_key, content_type, user_id, from_user_name, telegram_message_id, upload_source, created_at
+                    FROM document_uploads
+                    WHERE upload_source = 'TELEGRAM'
+                      AND COALESCE(file_name, '') ILIKE ?
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """.trimIndent(),
+                { rs, _ ->
+                    FileHistoryItem(
+                        id = rs.getLong("id"),
+                        fileName = rs.getString("file_name"),
+                        objectKey = rs.getString("object_key"),
+                        contentType = rs.getString("content_type"),
+                        userId = rs.getString("user_id"),
+                        fromUserName = rs.getString("from_user_name"),
+                        telegramMessageId = rs.getObject("telegram_message_id") as? Long,
+                        uploadSource = rs.getString("upload_source"),
+                        createdAt = rs.getObject("created_at").toString()
+                    )
+                },
+                "%$searchTerm%",
+                safeSize,
+                offset
             )
         }
-        val items = result.content.map { f ->
-            FileHistoryItem(
-                id = f.id!!,
-                fileName = f.fileName,
-                objectKey = f.objectKey,
-                contentType = f.contentType,
-                userId = f.userId,
-                fromUserName = f.fromUserName,
-                telegramMessageId = f.telegramMessageId,
-                uploadSource = f.uploadSource,
-                createdAt = f.createdAt.toString()
-            )
+
+        val totalElements = if (searchTerm == null) {
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM document_uploads WHERE upload_source = 'TELEGRAM'",
+                Long::class.java
+            ) ?: 0L
+        } else {
+            jdbcTemplate.queryForObject(
+                """
+                    SELECT COUNT(*)
+                    FROM document_uploads
+                    WHERE upload_source = 'TELEGRAM'
+                      AND COALESCE(file_name, '') ILIKE ?
+                """.trimIndent(),
+                Long::class.java,
+                "%$searchTerm%"
+            ) ?: 0L
         }
+        val totalPages = if (totalElements == 0L) 0 else ((totalElements + safeSize - 1) / safeSize).toInt()
+
         val response = FileHistoryResponse(
             content = items,
-            totalElements = result.totalElements,
-            totalPages = result.totalPages,
-            number = result.number,
-            size = result.size
+            totalElements = totalElements,
+            totalPages = totalPages,
+            number = safePage,
+            size = safeSize
         )
         return ResponseEntity.ok(LeeResult.ok(data = response))
     }

@@ -21,6 +21,7 @@ class HandleUpdateService(
     private val telegramApi: TelegramApiPort,
     private val aiServerUpload: AiServerUploadPort,
     private val aiServerTelegram: AiServerTelegramPort,
+    private val historySseService: HistorySseService,
     startHandler: StartCommandHandler?,
     timeHandler: TimeCommandHandler?,
     helpHandler: HelpCommandHandler?,
@@ -81,6 +82,8 @@ class HandleUpdateService(
             .doOnNext { saved ->
                 if (!saved) {
                     log.warn("Failed to save telegram message history: chatId={}, messageId={}", chatId, msgId)
+                } else {
+                    historySseService.publishMessageSaved()
                 }
             }
 
@@ -120,6 +123,8 @@ class HandleUpdateService(
                     .doOnNext { saved ->
                         if (!saved) {
                             log.warn("Failed to save telegram document history: chatId={}, messageId={}, fileName={}", chatId, tgMsgId, fileName)
+                        } else {
+                            historySseService.publishFileSaved()
                         }
                     }
                     .flatMap { ok ->
@@ -155,6 +160,8 @@ class HandleUpdateService(
                     .doOnNext { saved ->
                         if (!saved) {
                             log.warn("Failed to save telegram photo history: chatId={}, messageId={}, fileName={}", chatId, tgMsgId, fileName)
+                        } else {
+                            historySseService.publishFileSaved()
                         }
                     }
                     .flatMap { ok ->

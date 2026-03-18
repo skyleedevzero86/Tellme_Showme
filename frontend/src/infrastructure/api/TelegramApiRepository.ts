@@ -139,4 +139,8 @@ export const telegramApiRepository = {
     if (!res.ok) throw new Error(res.statusText);
     return res.json();
   },
+
+  getMessageHistoryEventsUrl(): string {
+    return buildUrl(ENDPOINTS.MESSAGE_HISTORY_EVENTS);
+  },
 };

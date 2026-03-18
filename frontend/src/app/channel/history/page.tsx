@@ -78,6 +78,34 @@ export default function ChannelHistoryPage() {
     if (tab === 'files') loadFiles(filePage, fileSearch || undefined);
   }, [tab, filePage, fileSearch, loadFiles]);
 
+  useEffect(() => {
+    const eventSource = new EventSource(telegramApiRepository.getMessageHistoryEventsUrl());
+
+    const refresh = (kind?: string) => {
+      if (kind === 'file') {
+        if (tab === 'files') loadFiles(filePage, fileSearch || undefined);
+        return;
+      }
+      if (tab === 'messages') {
+        loadMessages(messagePage, messageSearch || undefined);
+      }
+    };
+
+    const onRefresh = (event: MessageEvent) => {
+      refresh(typeof event.data === 'string' ? event.data : undefined);
+    };
+
+    eventSource.addEventListener('history-refresh', onRefresh as EventListener);
+    eventSource.onerror = () => {
+      setError((prev) => prev ?? '실시간 연결이 잠시 끊겼습니다. 자동으로 다시 연결합니다.');
+    };
+
+    return () => {
+      eventSource.removeEventListener('history-refresh', onRefresh as EventListener);
+      eventSource.close();
+    };
+  }, [tab, messagePage, filePage, messageSearch, fileSearch, loadMessages, loadFiles]);
+
   const handleMessageSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setMessageSearch(messageSearchInput.trim());
