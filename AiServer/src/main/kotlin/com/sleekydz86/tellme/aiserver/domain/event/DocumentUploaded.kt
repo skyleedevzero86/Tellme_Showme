@@ -8,5 +8,7 @@ data class DocumentUploaded(
     val objectKey: String,
     val contentType: String,
     val uploadSource: String,
+    val telegramMessageId: Long? = null,
+    val fromUserName: String? = null,
     val timestamp: Instant = Instant.now()
 ) : DomainEvent

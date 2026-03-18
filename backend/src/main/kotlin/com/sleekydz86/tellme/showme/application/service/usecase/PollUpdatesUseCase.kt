@@ -50,9 +50,10 @@ class PollUpdatesUseCase(
             val processedTexts = mutableListOf<String>()
             for (ur in update.result!!) {
                 val u = ur ?: continue
-                if (u.updateId != null && u.updateId > lastUpdateId.get() && u.message != null) {
-                    handleUpdateService.handle(u.message).block()
-                    u.message.text?.let { processedTexts.add(it) }
+                val incomingMessage = u.incomingMessage()
+                if (u.updateId != null && u.updateId > lastUpdateId.get() && incomingMessage != null) {
+                    handleUpdateService.handle(incomingMessage).block()
+                    incomingMessage.text?.let { processedTexts.add(it) }
                     lastUpdateId.set(u.updateId)
                 }
             }

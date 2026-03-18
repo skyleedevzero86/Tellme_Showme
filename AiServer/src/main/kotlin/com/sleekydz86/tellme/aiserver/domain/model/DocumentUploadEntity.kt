@@ -21,6 +21,10 @@ class DocumentUploadEntity(
     val encryptionIv: String? = null,
     @Column(nullable = false, length = 32)
     val uploadSource: String = "FRONTEND",
+    @Column
+    val telegramMessageId: Long? = null,
+    @Column(length = 255)
+    val fromUserName: String? = null,
     @Column(nullable = false)
     var usageCount: Long = 0L,
     @Column

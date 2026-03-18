@@ -24,7 +24,9 @@ class RagController(
     fun upload(
         @RequestParam("file") file: MultipartFile,
         @RequestHeader("X-User-Id", required = false) userId: String?,
-        @RequestHeader("X-Upload-Source", required = false) uploadSource: String?
+        @RequestHeader("X-Upload-Source", required = false) uploadSource: String?,
+        @RequestHeader("X-Telegram-Message-Id", required = false) telegramMessageId: Long?,
+        @RequestHeader("X-From-User-Name", required = false) fromUserName: String?
     ): LeeResult<Nothing> {
         val uid = userId ?: "익명"
         val source = when (uploadSource?.uppercase()) {
@@ -44,7 +46,9 @@ class RagController(
                             userId = uid,
                             objectKey = objectKey,
                             contentType = file.contentType ?: "application/octet-stream",
-                            uploadSource = source
+                            uploadSource = source,
+                            telegramMessageId = telegramMessageId,
+                            fromUserName = fromUserName
                         )
                     )
                     LeeResult.ok(msg = "파일이 성공적으로 업로드되었습니다.")

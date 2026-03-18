@@ -2,6 +2,7 @@ package com.sleekydz86.tellme.showme.application.service
 
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
+import com.sleekydz86.tellme.showme.application.port.AiServerTelegramPort
 import com.sleekydz86.tellme.showme.application.service.handler.*
 import com.sleekydz86.tellme.showme.domain.BotCommand
 import com.sleekydz86.tellme.showme.domain.MessageContext
@@ -12,12 +13,14 @@ import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 
 
 @Service
 class HandleUpdateService(
     private val telegramApi: TelegramApiPort,
     private val aiServerUpload: AiServerUploadPort,
+    private val aiServerTelegram: AiServerTelegramPort,
     startHandler: StartCommandHandler?,
     timeHandler: TimeCommandHandler?,
     helpHandler: HelpCommandHandler?,
@@ -66,13 +69,27 @@ class HandleUpdateService(
 
     private fun handleText(chatId: Long?, message: TelegramUpdate.Message?): Mono<Void> {
         val ctx = MessageContext.from(message) ?: return Mono.empty()
+        val msgId = message?.messageId ?: 0L
+        val fromId = message?.from?.id ?: 0L
+        val fromName = message?.from?.firstName?.takeIf { it.isNotBlank() }
+            ?: message?.from?.username?.takeIf { it.isNotBlank() }
+            ?: "사용자"
+        val resolvedFromId = message?.senderId() ?: fromId
+        val resolvedFromName = message?.senderDisplayName() ?: fromName
+        val receivedAt = message?.date?.let { Instant.ofEpochSecond(it) } ?: Instant.now()
+        val saveMono = aiServerTelegram.saveMessage(msgId, chatId!!, resolvedFromId, resolvedFromName, ctx.text, receivedAt)
+            .doOnNext { saved ->
+                if (!saved) {
+                    log.warn("Failed to save telegram message history: chatId={}, messageId={}", chatId, msgId)
+                }
+            }
 
         val cmd = BotCommand.from(ctx.text)
         val handler = (cmd?.let { commandHandlers[it] } ?: echoHandler) ?: return Mono.empty()
         val replyMono = handler.handle(ctx) ?: return Mono.empty()
 
-        return replyMono
-            .flatMap { reply -> telegramApi.sendMessage(chatId, reply)!! }
+        return saveMono
+            .then(replyMono.flatMap { reply -> telegramApi.sendMessage(chatId, reply)!! })
             .then()
     }
 
@@ -95,7 +112,16 @@ class HandleUpdateService(
                     log.warn("document read error", e)
                     return@flatMap telegramApi.sendMessage(chatId, "파일 읽기 오류: ${e.message}")!!.then()
                 }
-                aiServerUpload.upload(bytes, fileName, null, chatId.toString(), "TELEGRAM")
+                val tgMsgId = message.messageId ?: 0L
+                val fromName = message.from?.firstName?.takeIf { it.isNotBlank() }
+                    ?: message.from?.username?.takeIf { it.isNotBlank() }
+                val resolvedFromName = message.senderDisplayName() ?: fromName
+                aiServerUpload.upload(bytes, fileName, null, chatId.toString(), "TELEGRAM", tgMsgId, resolvedFromName)
+                    .doOnNext { saved ->
+                        if (!saved) {
+                            log.warn("Failed to save telegram document history: chatId={}, messageId={}, fileName={}", chatId, tgMsgId, fileName)
+                        }
+                    }
                     .flatMap { ok ->
                         val msg = if (ok) "파일을 받았습니다. (MinIO 저장)\n이름: $fileName\n크기: ${doc.fileSize} bytes"
                         else "파일 저장 중 오류가 발생했습니다."
@@ -121,7 +147,16 @@ class HandleUpdateService(
                     log.warn("photo read error", e)
                     return@flatMap telegramApi.sendMessage(chatId, "사진 읽기 오류: ${e.message}")!!.then()
                 }
-                aiServerUpload.upload(bytes, fileName, "image/jpeg", chatId.toString(), "TELEGRAM")
+                val tgMsgId = message.messageId ?: 0L
+                val fromName = message.from?.firstName?.takeIf { it.isNotBlank() }
+                    ?: message.from?.username?.takeIf { it.isNotBlank() }
+                val resolvedFromName = message.senderDisplayName() ?: fromName
+                aiServerUpload.upload(bytes, fileName, "image/jpeg", chatId.toString(), "TELEGRAM", tgMsgId, resolvedFromName)
+                    .doOnNext { saved ->
+                        if (!saved) {
+                            log.warn("Failed to save telegram photo history: chatId={}, messageId={}, fileName={}", chatId, tgMsgId, fileName)
+                        }
+                    }
                     .flatMap { ok ->
                         val msg = if (ok) "사진을 받았습니다. (MinIO 저장) 해상도 ${largest.width}x${largest.height}"
                         else "사진 저장 중 오류가 발생했습니다."

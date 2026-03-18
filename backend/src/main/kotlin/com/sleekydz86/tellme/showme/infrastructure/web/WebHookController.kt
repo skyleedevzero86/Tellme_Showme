@@ -7,6 +7,7 @@ import com.sleekydz86.tellme.showme.application.service.usecase.PollUpdatesUseCa
 import com.sleekydz86.tellme.showme.application.service.usecase.SetWebhookUseCase
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
+import com.sleekydz86.tellme.showme.application.port.AiServerHistoryPort
 import com.sleekydz86.tellme.showme.domain.dto.SendMessageResponse
 import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.WebhookUpdate
@@ -26,6 +27,7 @@ class WebHookController(
     private val pollUpdatesUseCase: PollUpdatesUseCase,
     private val channelBroadcastUseCase: ChannelBroadcastUseCase,
     private val aiServerUpload: AiServerUploadPort,
+    private val aiServerHistory: AiServerHistoryPort,
     private val properties: TelegramBotProperties
 ) {
     private val log = LoggerFactory.getLogger(WebHookController::class.java)
@@ -51,12 +53,12 @@ class WebHookController(
     fun deleteWebhook(): Mono<ResponseEntity<TelegramSendResponse>> {
         return (telegramApi.deleteWebhook() ?: Mono.empty())
             .map { ResponseEntity.ok(it) }
-            .defaultIfEmpty(ResponseEntity.ok(TelegramSendResponse(ok = false, description = "Not available", result = null)))
+            .defaultIfEmpty(ResponseEntity.ok(TelegramSendResponse(ok = false, description = "요청을 처리할 수 없습니다.", result = null)))
     }
 
     @GetMapping(value = ["/callback.do"], produces = [MediaType.TEXT_PLAIN_VALUE])
     fun callbackGet(): ResponseEntity<String> {
-        return ResponseEntity.ok("OK")
+        return ResponseEntity.ok("정상")
     }
 
     @GetMapping(value = ["/webHook.do"], produces = [MediaType.APPLICATION_JSON_VALUE])
@@ -140,14 +142,42 @@ class WebHookController(
             .map { ResponseEntity.ok(it) }
     }
 
+    @GetMapping(value = ["/message_history.do"], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun messageHistory(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(required = false) search: String?
+    ): Mono<ResponseEntity<String>> {
+        return aiServerHistory.getMessageHistory(page, size, search)
+            .map { body -> ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body) }
+            .defaultIfEmpty(ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body("{}"))
+    }
+
+    @GetMapping(value = ["/file_history.do"], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun fileHistory(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(required = false) search: String?
+    ): Mono<ResponseEntity<String>> {
+        return aiServerHistory.getFileHistory(page, size, search)
+            .map { body -> ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body) }
+            .defaultIfEmpty(ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body("{}"))
+    }
+
     @PostMapping(value = ["/callback.do"], produces = [MediaType.TEXT_PLAIN_VALUE])
     fun callback(@RequestBody(required = false) update: WebhookUpdate?): Mono<ResponseEntity<String>> {
-        log.info("Webhook callback received: update_id={}, message.text={}", update?.updateId, update?.message?.text)
+        val incomingMessage = update?.incomingMessage()
+        log.info(
+            "Webhook callback received: update_id={}, type={}, message.text={}",
+            update?.updateId,
+            update?.incomingMessageType(),
+            incomingMessage?.text
+        )
         val ok = ResponseEntity.ok("ok")
-        if (update == null || update.message == null) {
+        if (update == null || incomingMessage == null) {
             return Mono.just(ok)
         }
-        return handleUpdateService.handle(update.message)
+        return handleUpdateService.handle(incomingMessage)
             .then(Mono.just(ok))
             .onErrorResume { e ->
                 log.error("Callback handle error", e)

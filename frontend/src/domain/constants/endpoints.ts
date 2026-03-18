@@ -7,4 +7,6 @@ export const ENDPOINTS = {
   SEND_MESSAGE: 'send_message.do',
   FILE_UPLOAD: 'file_upload.do',
   DOCUMENT_UPLOAD: 'document_upload.do',
+  MESSAGE_HISTORY: 'message_history.do',
+  FILE_HISTORY: 'file_history.do',
 } as const;

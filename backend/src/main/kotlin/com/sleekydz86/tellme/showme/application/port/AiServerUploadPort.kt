@@ -8,6 +8,8 @@ interface AiServerUploadPort {
         fileName: String,
         contentType: String?,
         userId: String,
-        uploadSource: String
+        uploadSource: String,
+        telegramMessageId: Long? = null,
+        fromUserName: String? = null
     ): Mono<Boolean>
 }

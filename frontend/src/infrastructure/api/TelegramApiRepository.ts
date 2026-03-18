@@ -3,6 +3,8 @@ import type {
   WebhookInfoResponse,
   SendMessageResponse,
   GetUpdatesResponse,
+  MessageHistoryResponse,
+  FileHistoryResponse,
 } from '@/domain/types/api';
 import { ENDPOINTS } from '@/domain/constants/endpoints';
 
@@ -111,6 +113,30 @@ export const telegramApiRepository = {
     if (!res.ok) {
       throw new Error(await this._readErrorMessage(res));
     }
+    return res.json();
+  },
+
+  async getMessageHistory(
+    page: number = 0,
+    size: number = 20,
+    search?: string
+  ): Promise<MessageHistoryResponse> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (search != null && search.trim() !== '') params.set('search', search.trim());
+    const res = await fetch(`${buildUrl(ENDPOINTS.MESSAGE_HISTORY)}?${params.toString()}`);
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  },
+
+  async getFileHistory(
+    page: number = 0,
+    size: number = 20,
+    search?: string
+  ): Promise<FileHistoryResponse> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (search != null && search.trim() !== '') params.set('search', search.trim());
+    const res = await fetch(`${buildUrl(ENDPOINTS.FILE_HISTORY)}?${params.toString()}`);
+    if (!res.ok) throw new Error(res.statusText);
     return res.json();
   },
 };

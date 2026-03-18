@@ -23,6 +23,8 @@ export default function RootLayout({
           <Link href="/get-updates">Long Polling</Link>
           {' | '}
           <Link href="/channel">채널 브로드캐스트</Link>
+          {' | '}
+          <Link href="/channel/history">받은 메시지 이력</Link>
         </nav>
         <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
           {children}

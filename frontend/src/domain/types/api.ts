@@ -25,3 +25,50 @@ export type GetUpdatesResponse = {
   result: string;
   webhookActive?: boolean;
 };
+
+export type MessageHistoryItem = {
+  id: number;
+  telegramMessageId: number;
+  chatId: string;
+  fromUserId: string;
+  fromUserName: string | null;
+  text: string | null;
+  receivedAt: string;
+  createdAt: string;
+};
+
+export type MessageHistoryResponse = {
+  status: number;
+  msg: string;
+  data: {
+    content: MessageHistoryItem[];
+    totalElements: number;
+    totalPages: number;
+    number: number;
+    size: number;
+  } | null;
+};
+
+export type FileHistoryItem = {
+  id: number;
+  fileName: string;
+  objectKey: string;
+  contentType: string;
+  userId: string;
+  fromUserName: string | null;
+  telegramMessageId: number | null;
+  uploadSource: string;
+  createdAt: string;
+};
+
+export type FileHistoryResponse = {
+  status: number;
+  msg: string;
+  data: {
+    content: FileHistoryItem[];
+    totalElements: number;
+    totalPages: number;
+    number: number;
+    size: number;
+  } | null;
+};

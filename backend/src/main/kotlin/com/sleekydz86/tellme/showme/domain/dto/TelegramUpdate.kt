@@ -22,6 +22,18 @@ class TelegramUpdate {
 
         @JsonProperty("message")
         val message: Message? = null
+
+        @JsonProperty("channel_post")
+        val channelPost: Message? = null
+
+        fun incomingMessage(): Message? = message ?: channelPost
+
+        fun incomingMessageType(): String =
+            when {
+                message != null -> "message"
+                channelPost != null -> "channel_post"
+                else -> "unknown"
+            }
     }
 
     @Data
@@ -32,6 +44,9 @@ class TelegramUpdate {
 
         @JsonProperty("from")
         val from: User? = null
+
+        @JsonProperty("sender_chat")
+        val senderChat: Chat? = null
 
         @JsonProperty("chat")
         val chat: Chat? = null
@@ -53,6 +68,14 @@ class TelegramUpdate {
 
         @JsonProperty("video")
         val video: Video? = null
+
+        fun senderId(): Long? = from?.id ?: senderChat?.id
+
+        fun senderDisplayName(): String? =
+            from?.firstName?.takeIf { it.isNotBlank() }
+                ?: from?.username?.takeIf { it.isNotBlank() }
+                ?: senderChat?.title?.takeIf { it.isNotBlank() }
+                ?: senderChat?.username?.takeIf { it.isNotBlank() }
     }
 
     @Data
