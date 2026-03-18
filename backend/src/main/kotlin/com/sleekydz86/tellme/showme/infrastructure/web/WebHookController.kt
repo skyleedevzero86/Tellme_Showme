@@ -13,6 +13,7 @@ import com.sleekydz86.tellme.showme.domain.dto.TelegramSendResponse
 import com.sleekydz86.tellme.showme.domain.dto.WebhookUpdate
 import com.sleekydz86.tellme.showme.domain.dto.WebhookInfoResponse
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -162,6 +163,22 @@ class WebHookController(
         return aiServerHistory.getFileHistory(page, size, search)
             .map { body -> ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body) }
             .defaultIfEmpty(ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body("{}"))
+    }
+
+    @GetMapping(value = ["/file_preview.do"])
+    fun filePreview(@RequestParam("objectKey") objectKey: String): Mono<ResponseEntity<ByteArray>> {
+        return aiServerHistory.getFilePreview(objectKey)
+            .map { preview ->
+                val builder = ResponseEntity.ok()
+                val parsedMediaType = preview.contentType?.let { raw ->
+                    runCatching { MediaType.parseMediaType(raw) }.getOrNull()
+                }
+                if (parsedMediaType != null) {
+                    builder.contentType(parsedMediaType)
+                }
+                preview.contentDisposition?.let { builder.header(HttpHeaders.CONTENT_DISPOSITION, it) }
+                builder.body(preview.bytes)
+            }
     }
 
     @PostMapping(value = ["/callback.do"], produces = [MediaType.TEXT_PLAIN_VALUE])

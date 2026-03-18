@@ -5,14 +5,15 @@ import com.sleekydz86.tellme.showme.application.port.AiServerTelegramPort
 import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.io.ByteArrayResource
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.http.client.MultipartBodyBuilder
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import org.springframework.util.LinkedMultiValueMap
-import org.springframework.util.MultiValueMap
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 import java.time.Instant
+import java.net.URLEncoder
 
 @Component
 class AiServerWebClientAdapter(
@@ -29,17 +30,28 @@ class AiServerWebClientAdapter(
         telegramMessageId: Long?,
         fromUserName: String?
     ): Mono<Boolean> {
-        val body: MultiValueMap<String, Any> = LinkedMultiValueMap()
-        body.add("file", object : ByteArrayResource(bytes) {
+        val bodyBuilder = MultipartBodyBuilder()
+        val filePart = bodyBuilder.part("file", object : ByteArrayResource(bytes) {
             override fun getFilename(): String = fileName
         })
+        filePart.filename(fileName)
+        contentType
+            ?.takeIf { it.isNotBlank() }
+            ?.let { raw -> runCatching { MediaType.parseMediaType(raw) }.getOrNull() }
+            ?.let { filePart.contentType(it) }
+
+        bodyBuilder.part("userId", userId)
+        bodyBuilder.part("uploadSource", uploadSource)
+        telegramMessageId?.let { bodyBuilder.part("telegramMessageId", it.toString()) }
+        fromUserName?.let { bodyBuilder.part("fromUserName", it) }
+
+        val body = bodyBuilder.build()
         var requestSpec = webClient.post()
             .uri("/rag/upload")
             .header("X-User-Id", userId)
             .header("X-Upload-Source", uploadSource)
         if (uploadSource == "TELEGRAM") {
             telegramMessageId?.let { requestSpec = requestSpec.header("X-Telegram-Message-Id", it.toString()) }
-            fromUserName?.let { requestSpec = requestSpec.header("X-From-User-Name", it) }
         }
         return requestSpec
             .contentType(MediaType.MULTIPART_FORM_DATA)
@@ -109,6 +121,27 @@ class AiServerWebClientAdapter(
             .retrieve()
             .bodyToMono(String::class.java)
             .defaultIfEmpty("{}")
+    }
+
+    override fun getFilePreview(objectKey: String): Mono<com.sleekydz86.tellme.showme.application.port.FilePreviewPayload> {
+        val encodedObjectKey = URLEncoder.encode(objectKey, Charsets.UTF_8)
+        return webClient.get()
+            .uri("/api/telegram/files/preview?objectKey=$encodedObjectKey")
+            .exchangeToMono { response ->
+                if (!response.statusCode().is2xxSuccessful) {
+                    return@exchangeToMono response.createException().flatMap { Mono.error(it) }
+                }
+                val contentType = response.headers().contentType().map { it.toString() }.orElse(null)
+                val contentDisposition = response.headers().asHttpHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)
+                response.bodyToMono(ByteArray::class.java)
+                    .map { bytes ->
+                        com.sleekydz86.tellme.showme.application.port.FilePreviewPayload(
+                            bytes = bytes,
+                            contentType = contentType,
+                            contentDisposition = contentDisposition
+                        )
+                    }
+            }
     }
 
     private fun buildHistoryUri(path: String, page: Int, size: Int, search: String?): String {

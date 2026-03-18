@@ -1,13 +1,132 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import Link from 'next/link';
+import Image from 'next/image';
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { telegramApiRepository } from '@/infrastructure/api/TelegramApiRepository';
-import type { MessageHistoryItem, FileHistoryItem } from '@/domain/types/api';
+import type { FileHistoryItem, MessageHistoryItem } from '@/domain/types/api';
 
 const PAGE_SIZE = 20;
 
 type Tab = 'messages' | 'files';
+
+const tabButtonStyle = (active: boolean): CSSProperties => ({
+  padding: '10px 18px',
+  fontWeight: active ? 700 : 500,
+  border: '1px solid #1f2937',
+  background: active ? '#e5eefb' : '#ffffff',
+  color: '#111827',
+  cursor: 'pointer',
+  borderRadius: 999,
+});
+
+const fileGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+  gap: 16,
+};
+
+const fileCardStyle: CSSProperties = {
+  border: '1px solid #d1d5db',
+  borderRadius: 18,
+  overflow: 'hidden',
+  background: '#ffffff',
+  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+};
+
+const previewFrameStyle: CSSProperties = {
+  position: 'relative',
+  height: 220,
+  background: 'linear-gradient(135deg, #e5eefb 0%, #f8fafc 100%)',
+};
+
+const fileBodyStyle: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+  padding: 16,
+};
+
+const fileNameStyle: CSSProperties = {
+  fontSize: 16,
+  fontWeight: 700,
+  color: '#111827',
+  wordBreak: 'break-word',
+};
+
+const fileMetaStyle: CSSProperties = {
+  fontSize: 13,
+  color: '#475569',
+  wordBreak: 'break-word',
+};
+
+const objectKeyStyle: CSSProperties = {
+  ...fileMetaStyle,
+  fontFamily: 'monospace',
+  fontSize: 12,
+  color: '#64748b',
+};
+
+const actionLinkStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 'fit-content',
+  padding: '8px 12px',
+  borderRadius: 999,
+  border: '1px solid #2563eb',
+  color: '#2563eb',
+  textDecoration: 'none',
+  fontWeight: 600,
+};
+
+const emptyCardStyle: CSSProperties = {
+  padding: 24,
+  border: '1px dashed #cbd5e1',
+  borderRadius: 18,
+  color: '#64748b',
+  background: '#f8fafc',
+};
+
+const fileTypeBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 36,
+  fontWeight: 800,
+  color: '#1d4ed8',
+  letterSpacing: 1,
+};
+
+const isBrokenText = (value: string | null | undefined): boolean => {
+  const normalized = value?.trim();
+  return !normalized || /^\?+$/.test(normalized) || normalized.includes('�');
+};
+
+const resolveSenderLabel = (
+  rawName: string | null | undefined,
+  fallback: string
+): string => (isBrokenText(rawName) ? fallback : rawName!.trim());
+
+const isImageFile = (file: FileHistoryItem): boolean => {
+  const contentType = file.contentType ?? '';
+  if (contentType.startsWith('image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.fileName);
+};
+
+const getFileTypeLabel = (fileName: string): string => {
+  const extension = fileName.split('.').pop()?.trim().toUpperCase();
+  return extension && extension.length <= 5 ? extension : 'FILE';
+};
+
+const formatDate = (value: string): string => {
+  try {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ko-KR');
+  } catch {
+    return value;
+  }
+};
 
 export default function ChannelHistoryPage() {
   const [tab, setTab] = useState<Tab>('messages');
@@ -29,12 +148,13 @@ export default function ChannelHistoryPage() {
   const loadMessages = useCallback(async (page: number, search?: string) => {
     setLoading(true);
     setError(null);
+
     try {
-      const res = await telegramApiRepository.getMessageHistory(page, PAGE_SIZE, search);
-      if (res.data) {
-        setMessages(res.data.content);
-        setMessageTotal(res.data.totalElements);
-        setMessageTotalPages(res.data.totalPages);
+      const response = await telegramApiRepository.getMessageHistory(page, PAGE_SIZE, search);
+      if (response.data) {
+        setMessages(response.data.content);
+        setMessageTotal(response.data.totalElements);
+        setMessageTotalPages(response.data.totalPages);
       } else {
         setMessages([]);
         setMessageTotal(0);
@@ -51,12 +171,13 @@ export default function ChannelHistoryPage() {
   const loadFiles = useCallback(async (page: number, search?: string) => {
     setLoading(true);
     setError(null);
+
     try {
-      const res = await telegramApiRepository.getFileHistory(page, PAGE_SIZE, search);
-      if (res.data) {
-        setFiles(res.data.content);
-        setFileTotal(res.data.totalElements);
-        setFileTotalPages(res.data.totalPages);
+      const response = await telegramApiRepository.getFileHistory(page, PAGE_SIZE, search);
+      if (response.data) {
+        setFiles(response.data.content);
+        setFileTotal(response.data.totalElements);
+        setFileTotalPages(response.data.totalPages);
       } else {
         setFiles([]);
         setFileTotal(0);
@@ -71,11 +192,15 @@ export default function ChannelHistoryPage() {
   }, []);
 
   useEffect(() => {
-    if (tab === 'messages') loadMessages(messagePage, messageSearch || undefined);
+    if (tab === 'messages') {
+      loadMessages(messagePage, messageSearch || undefined);
+    }
   }, [tab, messagePage, messageSearch, loadMessages]);
 
   useEffect(() => {
-    if (tab === 'files') loadFiles(filePage, fileSearch || undefined);
+    if (tab === 'files') {
+      loadFiles(filePage, fileSearch || undefined);
+    }
   }, [tab, filePage, fileSearch, loadFiles]);
 
   useEffect(() => {
@@ -83,9 +208,12 @@ export default function ChannelHistoryPage() {
 
     const refresh = (kind?: string) => {
       if (kind === 'file') {
-        if (tab === 'files') loadFiles(filePage, fileSearch || undefined);
+        if (tab === 'files') {
+          loadFiles(filePage, fileSearch || undefined);
+        }
         return;
       }
+
       if (tab === 'messages') {
         loadMessages(messagePage, messageSearch || undefined);
       }
@@ -97,7 +225,7 @@ export default function ChannelHistoryPage() {
 
     eventSource.addEventListener('history-refresh', onRefresh as EventListener);
     eventSource.onerror = () => {
-      setError((prev) => prev ?? '실시간 연결이 잠시 끊겼습니다. 자동으로 다시 연결합니다.');
+      setError((previous) => previous ?? '실시간 연결이 잠시 끊겼습니다. 자동으로 다시 연결합니다.');
     };
 
     return () => {
@@ -106,83 +234,50 @@ export default function ChannelHistoryPage() {
     };
   }, [tab, messagePage, filePage, messageSearch, fileSearch, loadMessages, loadFiles]);
 
-  const handleMessageSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMessageSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setMessageSearch(messageSearchInput.trim());
     setMessagePage(0);
   };
 
-  const handleFileSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFileSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setFileSearch(fileSearchInput.trim());
     setFilePage(0);
   };
 
-  const formatDate = (s: string) => {
-    try {
-      const d = new Date(s);
-      return Number.isNaN(d.getTime()) ? s : d.toLocaleString('ko-KR');
-    } catch {
-      return s;
-    }
-  };
-
   return (
     <>
-      <p style={{ marginBottom: 16 }}>
-        <Link href="/channel">← 채널 브로드캐스트</Link>
-      </p>
-      <h2>받은 메시지 이력</h2>
-      <p>텔레그램에서 수신한 메시지와 파일(MinIO 암호화 저장) 이력을 검색·페이징하여 볼 수 있습니다.</p>
-      <hr />
+      <h2>텔레그램 수신 이력</h2>
 
-      <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => setTab('messages')}
-          style={{
-            padding: '8px 16px',
-            fontWeight: tab === 'messages' ? 'bold' : 'normal',
-            border: '1px solid #333',
-            background: tab === 'messages' ? '#e0e0e0' : 'transparent',
-            cursor: 'pointer',
-          }}
-        >
+      <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => setTab('messages')} style={tabButtonStyle(tab === 'messages')}>
           메시지 이력
         </button>
-        <button
-          type="button"
-          onClick={() => setTab('files')}
-          style={{
-            padding: '8px 16px',
-            fontWeight: tab === 'files' ? 'bold' : 'normal',
-            border: '1px solid #333',
-            background: tab === 'files' ? '#e0e0e0' : 'transparent',
-            cursor: 'pointer',
-          }}
-        >
-          파일 이력
+        <button type="button" onClick={() => setTab('files')} style={tabButtonStyle(tab === 'files')}>
+          파일 갤러리
         </button>
       </div>
 
-      {error && <p style={{ color: 'red', marginBottom: 8 }}>{error}</p>}
-      {loading && <p>불러오는 중…</p>}
+      {error && <p style={{ color: '#dc2626', marginBottom: 12 }}>{error}</p>}
+      {loading && <p>불러오는 중...</p>}
 
       {tab === 'messages' && (
         <section>
-          <form onSubmit={handleMessageSearch} style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+          <form onSubmit={handleMessageSearch} style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               type="text"
               value={messageSearchInput}
-              onChange={(e) => setMessageSearchInput(e.target.value)}
+              onChange={(event) => setMessageSearchInput(event.target.value)}
               placeholder="메시지 내용 검색"
-              style={{ padding: '6px 10px', width: 260 }}
+              style={{ padding: '8px 12px', width: 280, maxWidth: '100%' }}
             />
             <button type="submit">검색</button>
           </form>
+
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid #333', textAlign: 'left' }}>
+              <tr style={{ borderBottom: '2px solid #334155', textAlign: 'left' }}>
                 <th style={{ padding: 8 }}>수신 시각</th>
                 <th style={{ padding: 8 }}>보낸 사람</th>
                 <th style={{ padding: 8 }}>채팅 ID</th>
@@ -192,30 +287,30 @@ export default function ChannelHistoryPage() {
             <tbody>
               {messages.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={4} style={{ padding: 16, color: '#666' }}>
-                    메시지가 없습니다.
+                  <td colSpan={4} style={{ padding: 16, color: '#64748b' }}>
+                    메시지 이력이 없습니다.
                   </td>
                 </tr>
               )}
-              {messages.map((m) => (
-                <tr key={m.id} style={{ borderBottom: '1px solid #ddd' }}>
-                  <td style={{ padding: 8 }}>{formatDate(m.receivedAt)}</td>
-                  <td style={{ padding: 8 }}>{m.fromUserName ?? m.fromUserId}</td>
-                  <td style={{ padding: 8 }}>{m.chatId}</td>
-                  <td style={{ padding: 8, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {(m.text ?? '').slice(0, 200)}
-                    {(m.text?.length ?? 0) > 200 ? '…' : ''}
+
+              {messages.map((message) => (
+                <tr key={message.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: 8 }}>{formatDate(message.receivedAt)}</td>
+                  <td style={{ padding: 8 }}>
+                    {resolveSenderLabel(message.fromUserName, message.fromUserId)}
+                  </td>
+                  <td style={{ padding: 8 }}>{message.chatId}</td>
+                  <td style={{ padding: 8, maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {(message.text ?? '').slice(0, 200)}
+                    {(message.text?.length ?? 0) > 200 ? '...' : ''}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              disabled={messagePage <= 0 || loading}
-              onClick={() => setMessagePage((p) => p - 1)}
-            >
+            <button type="button" disabled={messagePage <= 0 || loading} onClick={() => setMessagePage((page) => page - 1)}>
               이전
             </button>
             <span>
@@ -224,7 +319,7 @@ export default function ChannelHistoryPage() {
             <button
               type="button"
               disabled={messagePage >= messageTotalPages - 1 || loading}
-              onClick={() => setMessagePage((p) => p + 1)}
+              onClick={() => setMessagePage((page) => page + 1)}
             >
               다음
             </button>
@@ -234,53 +329,65 @@ export default function ChannelHistoryPage() {
 
       {tab === 'files' && (
         <section>
-          <form onSubmit={handleFileSearch} style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+          <form onSubmit={handleFileSearch} style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               type="text"
               value={fileSearchInput}
-              onChange={(e) => setFileSearchInput(e.target.value)}
+              onChange={(event) => setFileSearchInput(event.target.value)}
               placeholder="파일명 검색"
-              style={{ padding: '6px 10px', width: 260 }}
+              style={{ padding: '8px 12px', width: 280, maxWidth: '100%' }}
             />
             <button type="submit">검색</button>
           </form>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #333', textAlign: 'left' }}>
-                <th style={{ padding: 8 }}>저장 시각</th>
-                <th style={{ padding: 8 }}>보낸 사람</th>
-                <th style={{ padding: 8 }}>파일명</th>
-                <th style={{ padding: 8 }}>Content-Type</th>
-                <th style={{ padding: 8 }}>객체 키</th>
-              </tr>
-            </thead>
-            <tbody>
-              {files.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={5} style={{ padding: 16, color: '#666' }}>
-                    파일 이력이 없습니다.
-                  </td>
-                </tr>
-              )}
-              {files.map((f) => (
-                <tr key={f.id} style={{ borderBottom: '1px solid #ddd' }}>
-                  <td style={{ padding: 8 }}>{formatDate(f.createdAt)}</td>
-                  <td style={{ padding: 8 }}>{f.fromUserName ?? f.userId}</td>
-                  <td style={{ padding: 8 }}>{f.fileName}</td>
-                  <td style={{ padding: 8 }}>{f.contentType}</td>
-                  <td style={{ padding: 8, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {f.objectKey}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+          <div style={{ marginBottom: 16, color: '#475569' }}>
+            MinIO 원본 기준으로 이미지 미리보기를 제공하고, 문서 파일은 바로 열어볼 수 있습니다.
+          </div>
+
+          <div style={fileGridStyle}>
+            {files.length === 0 && !loading && (
+              <div style={emptyCardStyle}>파일 이력이 없습니다.</div>
+            )}
+
+            {files.map((file) => {
+              const previewUrl = telegramApiRepository.getFilePreviewUrl(file.objectKey);
+              const senderLabel = resolveSenderLabel(file.fromUserName, '알 수 없음');
+              const imageFile = isImageFile(file);
+
+              return (
+                <article key={file.id} style={fileCardStyle}>
+                  <div style={previewFrameStyle}>
+                    {imageFile ? (
+                      <Image
+                        src={previewUrl}
+                        alt={file.fileName}
+                        fill
+                        unoptimized
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        style={{ objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={fileTypeBadgeStyle}>{getFileTypeLabel(file.fileName)}</div>
+                    )}
+                  </div>
+
+                  <div style={fileBodyStyle}>
+                    <div style={fileNameStyle}>{file.fileName}</div>
+                    <div style={fileMetaStyle}>보낸 사람: {senderLabel}</div>
+                    <div style={fileMetaStyle}>저장 시각: {formatDate(file.createdAt)}</div>
+                    <div style={fileMetaStyle}>형식: {file.contentType ?? 'application/octet-stream'}</div>
+                    <div style={objectKeyStyle}>{file.objectKey}</div>
+                    <a href={previewUrl} target="_blank" rel="noreferrer" style={actionLinkStyle}>
+                      {imageFile ? '원본 보기' : '파일 열기'}
+                    </a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              disabled={filePage <= 0 || loading}
-              onClick={() => setFilePage((p) => p - 1)}
-            >
+            <button type="button" disabled={filePage <= 0 || loading} onClick={() => setFilePage((page) => page - 1)}>
               이전
             </button>
             <span>
@@ -289,7 +396,7 @@ export default function ChannelHistoryPage() {
             <button
               type="button"
               disabled={filePage >= fileTotalPages - 1 || loading}
-              onClick={() => setFilePage((p) => p + 1)}
+              onClick={() => setFilePage((page) => page + 1)}
             >
               다음
             </button>

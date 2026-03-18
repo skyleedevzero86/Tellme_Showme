@@ -1,5 +1,6 @@
 package com.sleekydz86.tellme.aiserver.presentation.controller
 
+import com.sleekydz86.tellme.aiserver.aplication.port.StoragePort
 import com.sleekydz86.tellme.aiserver.domain.model.DocumentUploadEntity
 import com.sleekydz86.tellme.aiserver.domain.model.TelegramMessageEntity
 import com.sleekydz86.tellme.aiserver.infrastructure.persistence.DocumentUploadRepository
@@ -7,17 +8,23 @@ import com.sleekydz86.tellme.aiserver.infrastructure.persistence.TelegramMessage
 import com.sleekydz86.tellme.aiserver.presentation.dto.LeeResult
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import org.springframework.core.io.Resource
 import java.time.Instant
+import java.nio.charset.StandardCharsets
 
 @RestController
 @RequestMapping("/api/telegram")
 class TelegramHistoryController(
     private val telegramMessageRepository: TelegramMessageRepository,
     private val documentUploadRepository: DocumentUploadRepository,
-    private val jdbcTemplate: JdbcTemplate
+    private val jdbcTemplate: JdbcTemplate,
+    private val storagePort: StoragePort
 ) {
 
     @PostMapping("/messages")
@@ -213,6 +220,43 @@ class TelegramHistoryController(
         return ResponseEntity.ok(LeeResult.ok(data = response))
     }
 
+    @GetMapping("/files/preview")
+    fun previewFile(@RequestParam("objectKey") objectKey: String): ResponseEntity<Resource> {
+        val metadata = jdbcTemplate.query(
+            """
+                SELECT file_name, content_type
+                FROM document_uploads
+                WHERE upload_source = 'TELEGRAM'
+                  AND object_key = ?
+                LIMIT 1
+            """.trimIndent(),
+            { rs, _ ->
+                FilePreviewMetadata(
+                    fileName = rs.getString("file_name"),
+                    contentType = rs.getString("content_type")
+                )
+            },
+            objectKey
+        ).firstOrNull() ?: return ResponseEntity.notFound().build()
+
+        val resource = storagePort.get(objectKey)
+        val contentType = metadata.contentType
+            ?.takeIf { it.isNotBlank() }
+            ?.let { raw -> runCatching { MediaType.parseMediaType(raw) }.getOrNull() }
+            ?: MediaType.APPLICATION_OCTET_STREAM
+
+        return ResponseEntity.ok()
+            .contentType(contentType)
+            .header(
+                HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.inline()
+                    .filename(metadata.fileName, StandardCharsets.UTF_8)
+                    .build()
+                    .toString()
+            )
+            .body(resource)
+    }
+
     data class SaveTelegramMessageRequest(
         val telegramMessageId: Long,
         val chatId: Long,
@@ -259,6 +303,11 @@ class TelegramHistoryController(
         val totalPages: Int,
         val number: Int,
         val size: Int
+    )
+
+    data class FilePreviewMetadata(
+        val fileName: String,
+        val contentType: String?
     )
 
     private fun parseInstant(raw: String?): Instant? {

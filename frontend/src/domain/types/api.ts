@@ -53,7 +53,7 @@ export type FileHistoryItem = {
   id: number;
   fileName: string;
   objectKey: string;
-  contentType: string;
+  contentType: string | null;
   userId: string;
   fromUserName: string | null;
   telegramMessageId: number | null;

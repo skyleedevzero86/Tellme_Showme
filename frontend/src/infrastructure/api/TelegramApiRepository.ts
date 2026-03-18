@@ -143,4 +143,9 @@ export const telegramApiRepository = {
   getMessageHistoryEventsUrl(): string {
     return buildUrl(ENDPOINTS.MESSAGE_HISTORY_EVENTS);
   },
+
+  getFilePreviewUrl(objectKey: string): string {
+    const params = new URLSearchParams({ objectKey });
+    return `${buildUrl(ENDPOINTS.FILE_PREVIEW)}?${params.toString()}`;
+  },
 };

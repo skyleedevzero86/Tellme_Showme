@@ -9,5 +9,6 @@ export const ENDPOINTS = {
   DOCUMENT_UPLOAD: 'document_upload.do',
   MESSAGE_HISTORY: 'message_history.do',
   FILE_HISTORY: 'file_history.do',
+  FILE_PREVIEW: 'file_preview.do',
   MESSAGE_HISTORY_EVENTS: 'message_history_events.do',
 } as const;
