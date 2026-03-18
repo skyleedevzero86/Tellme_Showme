@@ -1,0 +1,33 @@
+.main {
+  min-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f4f7f9 0%, #e8eef3 100%);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 1000px;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.desc {
+  color: #555;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.hint {
+  color: #475569;
+  font-weight: 600;
+  text-align: center;
+}
+

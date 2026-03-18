@@ -48,16 +48,14 @@ export function WebhookPanel() {
   const loading = status === 'loading';
 
   return (
-    <section>
-      <h3>웹후크 설정 및 해제하기</h3>
-      <hr />
+    <section className="stack" style={{ marginTop: 12 }}>
       {statusState.kind === 'error' && (
-        <p style={{ marginBottom: 8, fontSize: 14, color: '#856404', background: '#fff3cd', padding: 8, borderRadius: 4 }}>
+        <p className="notice notice-warning">
           백엔드(8080)에 연결할 수 없습니다. 백엔드를 실행한 뒤 새로고침하세요.
         </p>
       )}
       {webhookInfo?.ok && webhookInfo.result?.url && (
-        <div style={{ marginBottom: 12, padding: 10, background: '#f8f9fa', borderRadius: 6, fontSize: 13 }}>
+        <div className="card">
           <strong>Telegram에 현재 등록된 URL</strong> (ngrok 재시작 시 자동으로 바뀌지 않음)
           <p style={{ margin: '6px 0 0', wordBreak: 'break-all' }}>
             <a href={webhookInfo.result.url} target="_blank" rel="noopener noreferrer">{webhookInfo.result.url}</a>
@@ -70,27 +68,27 @@ export function WebhookPanel() {
           )}
         </div>
       )}
-      <p style={{ marginBottom: 6, fontSize: 14 }}>
-        <label>
-          웹후크에 등록할 URL (ngrok 실행 후 나온 <strong>현재</strong> 주소 + <code>/callback.do</code>)
+      <div className="stack">
+        <label style={{ fontWeight: 700 }}>
+          웹후크에 등록할 URL <span className="muted">(ngrok 현재 주소 + <code>/callback.do</code>)</span>
         </label>
-      </p>
       <input
         type="url"
         value={webhookUrlInput}
         onChange={(e) => setWebhookUrlInput(e.target.value)}
         placeholder="https://xxxx.ngrok-free.app/callback.do"
-        style={{ width: '100%', maxWidth: 480, padding: 6, marginBottom: 8, boxSizing: 'border-box' }}
+        style={{ width: '100%', maxWidth: 560 }}
       />
       {statusState.kind === 'ok' && statusState.url && !webhookUrlInput && (
-        <p style={{ marginBottom: 8, fontSize: 13, color: '#666' }}>
+        <p className="muted" style={{ fontSize: 13 }}>
           설정(application.yml) 기준 URL: <a href={statusState.url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{statusState.url}</a>
         </p>
       )}
-      <p style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
+      <p className="muted" style={{ fontSize: 12 }}>
         ngrok을 재실행하면 URL이 바뀝니다. <strong>지금 ngrok 터미널에 표시된 주소만</strong> 입력하세요. 예전에 복사해 둔 주소(예: 이전 세션의 bea7, e138 등)는 재시작 후에는 쓸 수 없어서 「호스트를 찾지 못했습니다」 오류가 납니다.
       </p>
-      <div>
+      </div>
+      <div className="row">
         <button type="button" onClick={handleSet} disabled={loading}>
           설정
         </button>
@@ -101,13 +99,10 @@ export function WebhookPanel() {
           {deleteLoading ? '처리 중…' : 'Telegram에서만 삭제'}
         </button>
       </div>
-      <br />
-      <h3>결과</h3>
-      <hr />
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p className="notice notice-warning">{error}</p>}
       {result != null && result.ok === true && result.description && (
         <>
-          <p style={{ color: '#155724', background: '#d4edda', padding: 8, borderRadius: 4, marginBottom: 8 }}>
+          <p className="notice notice-success">
             {result.description === 'Webhook was set'
               ? '웹후크가 설정되었습니다.'
               : result.description === 'Webhook is already deleted'
@@ -115,7 +110,7 @@ export function WebhookPanel() {
                 : result.description}
           </p>
           {result.description === 'Webhook was set' && (
-            <div style={{ marginBottom: 12, padding: 12, background: '#e7f3ff', borderRadius: 8, fontSize: 14 }}>
+            <div className="notice notice-info">
               <strong>다음 단계</strong>
               <ol style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
                 <li>텔레그램에서 봇에게 아무 메시지나 보내기</li>
@@ -127,7 +122,7 @@ export function WebhookPanel() {
         </>
       )}
       {result != null && (
-        <pre style={{ fontSize: 12 }}>{JSON.stringify(result, null, 2)}</pre>
+        <pre className="card">{JSON.stringify(result, null, 2)}</pre>
       )}
     </section>
   );

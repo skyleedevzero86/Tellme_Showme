@@ -19,7 +19,7 @@ export function useGetUpdates() {
       setLastWebhookActive(Boolean(data.webhookActive));
       return data;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Error';
+      const message = e instanceof Error ? e.message : '오류가 발생했습니다.';
       setStatus(message);
       setLastUpdated(new Date());
       setLastWebhookActive(false);

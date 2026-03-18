@@ -2,23 +2,29 @@ import { WebhookPanel } from '@/presentation/components/WebhookPanel';
 
 export default function WebhookPage() {
   return (
-    <>
-      <h2>텔레그램 봇 예제 (웹후크)</h2>
-      <hr />
-      <ul>
-        <li>텔레그램에서 봇을 대화상대로 추가합니다.</li>
-        <li>setWebhook으로 봇이 수신한 메시지를 청취할 URL을 설정합니다.</li>
-        <li>봇 명령: /lotto, /god, /eng 등</li>
-      </ul>
-      <div style={{ marginTop: 12, padding: 12, background: '#f5f5f5', borderRadius: 8, fontSize: 14 }}>
-        <strong>웹후크 vs 폴링</strong>
-        <ul style={{ marginTop: 8, marginBottom: 0 }}>
-          <li><strong>웹후크 설정</strong>: 서버에 <code>TELEGRAM_WEBHOOK_URL</code> 환경 변수로 <strong>HTTPS URL</strong>을 넣어야 합니다. (Telegram은 443, 80, 88, 8443 포트만 지원)</li>
-          <li><strong>로컬 개발</strong>: localhost는 HTTPS가 아니므로 웹후크를 쓰기 어렵습니다. 백엔드의 <strong>폴링(getUpdates)</strong>을 사용하면 됩니다. <code>application.yml</code>에서 <code>polling.enabled: true</code>로 두면 주기적으로 메시지를 가져옵니다.</li>
-        </ul>
+    <div className="chat-layout">
+      <div className="chat-container">
+        <header className="chat-header">
+          웹후크 설정
+          <span className="chat-header-sub">ngrok HTTPS URL을 등록/해제하고 상태를 확인합니다.</span>
+        </header>
+        <div className="chat-messages">
+          <div className="card">
+            <strong>웹후크 vs 폴링</strong>
+            <ul className="muted" style={{ marginTop: 8, paddingLeft: 18 }}>
+              <li>
+                <strong>웹후크</strong>: 서버에 <code>TELEGRAM_WEBHOOK_URL</code>로 <strong>HTTPS URL</strong>을 넣어야 합니다.
+                (Telegram은 443, 80, 88, 8443 포트만 지원)
+              </li>
+              <li>
+                <strong>로컬 개발</strong>: localhost는 HTTPS가 아니라 웹후크가 어렵습니다. 대신 <strong>폴링(getUpdates)</strong>을 사용하세요.
+                <code>application.yml</code>에서 <code>polling.enabled: true</code>.
+              </li>
+            </ul>
+          </div>
+          <WebhookPanel />
+        </div>
       </div>
-      <br />
-      <WebhookPanel />
-    </>
+    </div>
   );
 }

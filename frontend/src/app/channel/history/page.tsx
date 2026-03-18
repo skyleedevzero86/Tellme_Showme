@@ -247,162 +247,163 @@ export default function ChannelHistoryPage() {
   };
 
   return (
-    <>
-      <h2>텔레그램 수신 이력</h2>
+    <div className="chat-layout">
+      <div className="chat-container">
+        <header className="chat-header">
+          텔레그램 수신 이력
+          <span className="chat-header-sub">메시지·파일 업로드 이력을 페이징/검색합니다.</span>
+        </header>
 
-      <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" onClick={() => setTab('messages')} style={tabButtonStyle(tab === 'messages')}>
-          메시지 이력
-        </button>
-        <button type="button" onClick={() => setTab('files')} style={tabButtonStyle(tab === 'files')}>
-          파일 갤러리
-        </button>
+        <div className="chat-messages">
+          <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setTab('messages')} style={tabButtonStyle(tab === 'messages')}>
+              메시지 이력
+            </button>
+            <button type="button" onClick={() => setTab('files')} style={tabButtonStyle(tab === 'files')}>
+              파일 갤러리
+            </button>
+          </div>
+
+          {error && <p style={{ color: '#dc2626', marginBottom: 12 }}>{error}</p>}
+          {loading && <p>불러오는 중...</p>}
+
+          {tab === 'messages' && (
+            <section className="section">
+              <form onSubmit={handleMessageSearch} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={messageSearchInput}
+                  onChange={(event) => setMessageSearchInput(event.target.value)}
+                  placeholder="메시지 내용 검색"
+                />
+                <button type="submit">검색</button>
+              </form>
+
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>수신 시각</th>
+                    <th>보낸 사람</th>
+                    <th>채팅 ID</th>
+                    <th>내용</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {messages.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: 16, color: '#64748b' }}>
+                        메시지 이력이 없습니다.
+                      </td>
+                    </tr>
+                  )}
+
+                  {messages.map((message) => (
+                    <tr key={message.id}>
+                      <td>{formatDate(message.receivedAt)}</td>
+                      <td>{resolveSenderLabel(message.fromUserName, message.fromUserId)}</td>
+                      <td>{message.chatId}</td>
+                      <td style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {(message.text ?? '').slice(0, 200)}
+                        {(message.text?.length ?? 0) > 200 ? '...' : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button type="button" disabled={messagePage <= 0 || loading} onClick={() => setMessagePage((page) => page - 1)}>
+                  이전
+                </button>
+                <span>
+                  {messagePage + 1} / {Math.max(1, messageTotalPages)} (총 {messageTotal}건)
+                </span>
+                <button
+                  type="button"
+                  disabled={messagePage >= messageTotalPages - 1 || loading}
+                  onClick={() => setMessagePage((page) => page + 1)}
+                >
+                  다음
+                </button>
+              </div>
+            </section>
+          )}
+
+          {tab === 'files' && (
+            <section className="section">
+              <form onSubmit={handleFileSearch} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={fileSearchInput}
+                  onChange={(event) => setFileSearchInput(event.target.value)}
+                  placeholder="파일명 검색"
+                />
+                <button type="submit">검색</button>
+              </form>
+
+              <div className="muted">
+                MinIO 원본 기준으로 이미지 미리보기를 제공하고, 문서 파일은 바로 열어볼 수 있습니다.
+              </div>
+
+              <div style={fileGridStyle}>
+                {files.length === 0 && !loading && <div style={emptyCardStyle}>파일 이력이 없습니다.</div>}
+
+                {files.map((file) => {
+                  const previewUrl = telegramApiRepository.getFilePreviewUrl(file.objectKey);
+                  const senderLabel = resolveSenderLabel(file.fromUserName, '알 수 없음');
+                  const imageFile = isImageFile(file);
+
+                  return (
+                    <article key={file.id} style={fileCardStyle}>
+                      <div style={previewFrameStyle}>
+                        {imageFile ? (
+                          <Image
+                            src={previewUrl}
+                            alt={file.fileName}
+                            fill
+                            unoptimized
+                            sizes="(max-width: 768px) 100vw, 33vw"
+                            style={{ objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div style={fileTypeBadgeStyle}>{getFileTypeLabel(file.fileName)}</div>
+                        )}
+                      </div>
+
+                      <div style={fileBodyStyle}>
+                        <div style={fileNameStyle}>{file.fileName}</div>
+                        <div style={fileMetaStyle}>보낸 사람: {senderLabel}</div>
+                        <div style={fileMetaStyle}>저장 시각: {formatDate(file.createdAt)}</div>
+                        <div style={fileMetaStyle}>형식: {file.contentType ?? 'application/octet-stream'}</div>
+                        <div style={objectKeyStyle}>{file.objectKey}</div>
+                        <a href={previewUrl} target="_blank" rel="noreferrer" style={actionLinkStyle}>
+                          {imageFile ? '원본 보기' : '파일 열기'}
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button type="button" disabled={filePage <= 0 || loading} onClick={() => setFilePage((page) => page - 1)}>
+                  이전
+                </button>
+                <span>
+                  {filePage + 1} / {Math.max(1, fileTotalPages)} (총 {fileTotal}건)
+                </span>
+                <button
+                  type="button"
+                  disabled={filePage >= fileTotalPages - 1 || loading}
+                  onClick={() => setFilePage((page) => page + 1)}
+                >
+                  다음
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
       </div>
-
-      {error && <p style={{ color: '#dc2626', marginBottom: 12 }}>{error}</p>}
-      {loading && <p>불러오는 중...</p>}
-
-      {tab === 'messages' && (
-        <section>
-          <form onSubmit={handleMessageSearch} style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              value={messageSearchInput}
-              onChange={(event) => setMessageSearchInput(event.target.value)}
-              placeholder="메시지 내용 검색"
-              style={{ padding: '8px 12px', width: 280, maxWidth: '100%' }}
-            />
-            <button type="submit">검색</button>
-          </form>
-
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #334155', textAlign: 'left' }}>
-                <th style={{ padding: 8 }}>수신 시각</th>
-                <th style={{ padding: 8 }}>보낸 사람</th>
-                <th style={{ padding: 8 }}>채팅 ID</th>
-                <th style={{ padding: 8 }}>내용</th>
-              </tr>
-            </thead>
-            <tbody>
-              {messages.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={4} style={{ padding: 16, color: '#64748b' }}>
-                    메시지 이력이 없습니다.
-                  </td>
-                </tr>
-              )}
-
-              {messages.map((message) => (
-                <tr key={message.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: 8 }}>{formatDate(message.receivedAt)}</td>
-                  <td style={{ padding: 8 }}>
-                    {resolveSenderLabel(message.fromUserName, message.fromUserId)}
-                  </td>
-                  <td style={{ padding: 8 }}>{message.chatId}</td>
-                  <td style={{ padding: 8, maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {(message.text ?? '').slice(0, 200)}
-                    {(message.text?.length ?? 0) > 200 ? '...' : ''}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <button type="button" disabled={messagePage <= 0 || loading} onClick={() => setMessagePage((page) => page - 1)}>
-              이전
-            </button>
-            <span>
-              {messagePage + 1} / {Math.max(1, messageTotalPages)} (총 {messageTotal}건)
-            </span>
-            <button
-              type="button"
-              disabled={messagePage >= messageTotalPages - 1 || loading}
-              onClick={() => setMessagePage((page) => page + 1)}
-            >
-              다음
-            </button>
-          </div>
-        </section>
-      )}
-
-      {tab === 'files' && (
-        <section>
-          <form onSubmit={handleFileSearch} style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              value={fileSearchInput}
-              onChange={(event) => setFileSearchInput(event.target.value)}
-              placeholder="파일명 검색"
-              style={{ padding: '8px 12px', width: 280, maxWidth: '100%' }}
-            />
-            <button type="submit">검색</button>
-          </form>
-
-          <div style={{ marginBottom: 16, color: '#475569' }}>
-            MinIO 원본 기준으로 이미지 미리보기를 제공하고, 문서 파일은 바로 열어볼 수 있습니다.
-          </div>
-
-          <div style={fileGridStyle}>
-            {files.length === 0 && !loading && (
-              <div style={emptyCardStyle}>파일 이력이 없습니다.</div>
-            )}
-
-            {files.map((file) => {
-              const previewUrl = telegramApiRepository.getFilePreviewUrl(file.objectKey);
-              const senderLabel = resolveSenderLabel(file.fromUserName, '알 수 없음');
-              const imageFile = isImageFile(file);
-
-              return (
-                <article key={file.id} style={fileCardStyle}>
-                  <div style={previewFrameStyle}>
-                    {imageFile ? (
-                      <Image
-                        src={previewUrl}
-                        alt={file.fileName}
-                        fill
-                        unoptimized
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        style={{ objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div style={fileTypeBadgeStyle}>{getFileTypeLabel(file.fileName)}</div>
-                    )}
-                  </div>
-
-                  <div style={fileBodyStyle}>
-                    <div style={fileNameStyle}>{file.fileName}</div>
-                    <div style={fileMetaStyle}>보낸 사람: {senderLabel}</div>
-                    <div style={fileMetaStyle}>저장 시각: {formatDate(file.createdAt)}</div>
-                    <div style={fileMetaStyle}>형식: {file.contentType ?? 'application/octet-stream'}</div>
-                    <div style={objectKeyStyle}>{file.objectKey}</div>
-                    <a href={previewUrl} target="_blank" rel="noreferrer" style={actionLinkStyle}>
-                      {imageFile ? '원본 보기' : '파일 열기'}
-                    </a>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <button type="button" disabled={filePage <= 0 || loading} onClick={() => setFilePage((page) => page - 1)}>
-              이전
-            </button>
-            <span>
-              {filePage + 1} / {Math.max(1, fileTotalPages)} (총 {fileTotal}건)
-            </span>
-            <button
-              type="button"
-              disabled={filePage >= fileTotalPages - 1 || loading}
-              onClick={() => setFilePage((page) => page + 1)}
-            >
-              다음
-            </button>
-          </div>
-        </section>
-      )}
-    </>
+    </div>
   );
 }
