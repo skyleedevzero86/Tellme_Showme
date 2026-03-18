@@ -8,5 +8,16 @@ data class WebhookUpdate(
     @JsonProperty("update_id")
     val updateId: Long? = null,
     @JsonProperty("message")
-    val message: TelegramUpdate.Message? = null
-)
+    val message: TelegramUpdate.Message? = null,
+    @JsonProperty("channel_post")
+    val channelPost: TelegramUpdate.Message? = null
+) {
+    fun incomingMessage(): TelegramUpdate.Message? = message ?: channelPost
+
+    fun incomingMessageType(): String =
+        when {
+            message != null -> "message"
+            channelPost != null -> "channel_post"
+            else -> "unknown"
+        }
+}

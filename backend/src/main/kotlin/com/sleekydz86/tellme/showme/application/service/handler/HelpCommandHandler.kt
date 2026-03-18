@@ -11,12 +11,17 @@ class HelpCommandHandler : CommandHandler {
     }
 
     companion object {
-        private const val BODY = ("지원 기능:\n"
-                + "• /start — 시작 메시지\n"
-                + "• /time — 현재 시간\n"
-                + "• /lotto — 예측 로또 번호\n"
-                + "• /god — 성경 영문과 한글 번역\n"
-                + "• /eng — 미국인이 가장 많이 쓰는 영어\n"
-                + "• 문서/사진/음성/동영상 전송 시 파일 다운로드")
+        private const val BODY = (
+            "지원 기능:\n" +
+                "- /start : 시작 메시지\n" +
+                "- /time : 현재 시간 안내 후 알람 설정\n" +
+                "- /lotto : 로또 번호\n" +
+                "- /eng : AiServer 영어 대화 모드 시작\n" +
+                "- /god : AiServer 명언 대화 모드 시작\n" +
+                "- /search 질문 : /channel 에 업로드한 문서 기반 검색\n" +
+                "- /end : /eng, /god, 알람 설정 흐름 종료\n" +
+                "- bye : /eng 또는 /god 대화 모드 종료\n" +
+                "- 문서/사진/음성/동영상 전송 : 파일 다운로드"
+            )
     }
 }

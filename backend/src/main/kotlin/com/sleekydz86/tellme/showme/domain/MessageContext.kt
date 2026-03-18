@@ -7,6 +7,18 @@ data class MessageContext(
     val text: String? = null,
     val firstName: String? = null
 ) {
+    fun commandArgument(): String? {
+        val trimmed = text?.trim().orEmpty()
+        if (trimmed.isBlank()) return null
+
+        val firstSpaceIndex = trimmed.indexOf(' ')
+        if (firstSpaceIndex < 0) return null
+
+        return trimmed.substring(firstSpaceIndex + 1)
+            .trim()
+            .takeIf { it.isNotBlank() }
+    }
+
     companion object {
         fun from(message: TelegramUpdate.Message?): MessageContext? {
             if (message == null) return null

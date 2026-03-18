@@ -21,7 +21,7 @@ export function useWebhook() {
       setStatus('success');
       return data;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Unknown error';
+      const message = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.';
       setError(message);
       setStatus('error');
       throw e;

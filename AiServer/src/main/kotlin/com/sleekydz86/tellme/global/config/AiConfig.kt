@@ -1,5 +1,7 @@
 package com.sleekydz86.tellme.global.config
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.json.JsonMapper
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -16,4 +18,7 @@ class AiConfig {
         Paths.get(cacheDir).toFile().mkdirs()
         return cacheDir
     }
+
+    @Bean
+    fun objectMapper(): ObjectMapper = JsonMapper.builder().findAndAddModules().build()
 }

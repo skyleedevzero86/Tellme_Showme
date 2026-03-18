@@ -15,18 +15,26 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <nav style={{ marginBottom: 24, fontSize: 14 }}>
-          <Link href="/">홈</Link>
-          {' | '}
-          <Link href="/webhook">웹후크</Link>
-          {' | '}
-          <Link href="/get-updates">Long Polling</Link>
-          {' | '}
-          <Link href="/channel">채널 브로드캐스트</Link>
-        </nav>
-        <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
-          {children}
-        </main>
+        <div className="app-shell">
+          <nav className="top-nav">
+            <Link className="nav-link" href="/">
+              홈
+            </Link>
+            <Link className="nav-link" href="/webhook">
+              웹후크
+            </Link>
+            <Link className="nav-link" href="/get-updates">
+              Long Polling
+            </Link>
+            <Link className="nav-link" href="/channel">
+              채널 브로드캐스트
+            </Link>
+            <Link className="nav-link" href="/channel/history">
+              받은 메시지 이력
+            </Link>
+          </nav>
+          <main className="page-container">{children}</main>
+        </div>
       </body>
     </html>
   );

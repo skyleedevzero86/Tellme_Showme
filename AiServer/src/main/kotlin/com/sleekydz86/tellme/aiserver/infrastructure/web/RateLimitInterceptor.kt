@@ -15,7 +15,7 @@ class RateLimitInterceptor(
 ) : HandlerInterceptor {
 
     override fun preHandle(request: HttpServletRequest, response: HttpServletResponse, handler: Any): Boolean {
-        val key = request.getHeader("X-User-Id") ?: request.remoteAddr ?: "anonymous"
+        val key = request.getHeader("X-User-Id") ?: request.remoteAddr ?: "익명"
         val rateKey = "api:$key"
         if (!rateLimitPort.isAllowed(rateKey, maxRequests, windowSeconds)) {
             response.status = 429

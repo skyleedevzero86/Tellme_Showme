@@ -7,6 +7,7 @@ class TelegramBotProperties {
     var bot: Bot = Bot()
     var api: Api = Api()
     var files: Files = Files()
+    var alarm: Alarm = Alarm()
     var bibleApiUrl: String = ""
     var englishApiUrl: String = ""
     var channelUsername: String = ""
@@ -22,5 +23,9 @@ class TelegramBotProperties {
 
     class Files {
         var downloadDir: String = System.getProperty("java.io.tmpdir") + "/tellme-showme/files"
+    }
+
+    class Alarm {
+        var zoneId: String = "Asia/Seoul"
     }
 }

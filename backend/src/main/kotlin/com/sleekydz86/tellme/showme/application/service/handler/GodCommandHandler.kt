@@ -1,13 +1,35 @@
 package com.sleekydz86.tellme.showme.application.service.handler
 
-import com.sleekydz86.tellme.showme.application.port.ExternalContentPort
+import com.sleekydz86.tellme.showme.application.port.AiServerModeChatPort
+import com.sleekydz86.tellme.showme.application.service.TelegramConversationModeStore
+import com.sleekydz86.tellme.showme.domain.ConversationMode
 import com.sleekydz86.tellme.showme.domain.MessageContext
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Mono
 
 @Component
-class GodCommandHandler(private val externalContent: ExternalContentPort) : CommandHandler {
+class GodCommandHandler(
+    private val conversationModeStore: TelegramConversationModeStore,
+    private val aiServerModeChat: AiServerModeChatPort
+) : CommandHandler {
+
     override fun handle(ctx: MessageContext?): Mono<String> {
-        return Mono.justOrEmpty(externalContent.bible)
+        val chatId = ctx?.chatId ?: return Mono.just(CHAT_NOT_FOUND_MESSAGE)
+        conversationModeStore.activate(chatId, ConversationMode.GOD)
+
+        val prompt = ctx.commandArgument()
+        if (prompt.isNullOrBlank()) {
+            return Mono.just(INTRO_MESSAGE)
+        }
+
+        return aiServerModeChat.chat(chatId.toString(), prompt, ConversationMode.GOD)
+            .map { if (it.isBlank()) EMPTY_REPLY_MESSAGE else it }
+    }
+
+    companion object {
+        private const val CHAT_NOT_FOUND_MESSAGE = "채팅 정보를 찾지 못했습니다."
+        private const val INTRO_MESSAGE =
+            "명언 대화 모드를 시작했어요. 이제 일반 메시지를 보내면 AiServer가 짧은 명언이나 격언 느낌으로 답합니다. 종료는 bye 또는 /end 를 입력해 주세요."
+        private const val EMPTY_REPLY_MESSAGE = "명언 대화 응답이 비어 있습니다."
     }
 }

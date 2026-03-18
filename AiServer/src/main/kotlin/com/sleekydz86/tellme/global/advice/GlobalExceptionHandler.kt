@@ -1,5 +1,6 @@
 package com.sleekydz86.tellme.global.advice
 
+import com.sleekydz86.tellme.aiserver.presentation.dto.LeeResult
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -20,10 +21,10 @@ class GlobalExceptionHandler {
     fun handleValidation(ex: MethodArgumentNotValidException): ResponseEntity<LeeResult<Nothing>> {
         val message = ex.bindingResult.fieldErrors
             .joinToString(", ") { err: FieldError -> "${err.field}: ${err.defaultMessage ?: "유효하지 않음"}" }
-        logger.warn("검증 실패: {}", message)
+        logger.warn("유효성 검사 실패: {}", message)
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
-            .body(LeeResult.error(message, HttpStatus.BAD_REQUEST.value()))
+            .body(LeeResult.error<Nothing>(message, HttpStatus.BAD_REQUEST.value()))
     }
 
     @ExceptionHandler(HttpMessageNotReadableException::class)
@@ -31,23 +32,23 @@ class GlobalExceptionHandler {
         logger.warn("잘못된 요청 본문: {}", ex.message)
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
-            .body(LeeResult.error("요청 본문이 올바르지 않습니다.", HttpStatus.BAD_REQUEST.value()))
+            .body(LeeResult.error<Nothing>("요청 본문이 올바르지 않습니다.", HttpStatus.BAD_REQUEST.value()))
     }
 
     @ExceptionHandler(IllegalArgumentException::class, IllegalStateException::class)
     fun handleBadArgument(ex: Exception): ResponseEntity<LeeResult<Nothing>> {
-        logger.warn("잘못된 인자 또는 상태: {}", ex.message)
+        logger.warn("잘못된 요청 상태: {}", ex.message)
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
-            .body(LeeResult.error(ex.message ?: "잘못된 요청입니다.", HttpStatus.BAD_REQUEST.value()))
+            .body(LeeResult.error<Nothing>(ex.message ?: "잘못된 요청입니다.", HttpStatus.BAD_REQUEST.value()))
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException::class)
     fun handleMaxUploadSize(ex: MaxUploadSizeExceededException): ResponseEntity<LeeResult<Nothing>> {
-        logger.warn("업로드 용량 초과: {}", ex.message)
+        logger.warn("업로드 크기 초과: {}", ex.message)
         return ResponseEntity
             .status(HttpStatus.PAYLOAD_TOO_LARGE)
-            .body(LeeResult.error("파일 크기가 제한을 초과합니다.", HttpStatus.PAYLOAD_TOO_LARGE.value()))
+            .body(LeeResult.error<Nothing>("파일 크기 제한을 초과했습니다.", HttpStatus.PAYLOAD_TOO_LARGE.value()))
     }
 
     @ExceptionHandler(ResponseStatusException::class)
@@ -57,7 +58,7 @@ class GlobalExceptionHandler {
         logger.warn("응답 상태 예외: {} - {}", status, message)
         return ResponseEntity
             .status(status)
-            .body(LeeResult.error(message, status.value()))
+            .body(LeeResult.error<Nothing>(message, status.value()))
     }
 
     @ExceptionHandler(Exception::class)
@@ -65,6 +66,11 @@ class GlobalExceptionHandler {
         logger.error("처리되지 않은 예외: {}", ex.message, ex)
         return ResponseEntity
             .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(LeeResult.error("오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", HttpStatus.INTERNAL_SERVER_ERROR.value()))
+            .body(
+                LeeResult.error<Nothing>(
+                    "예기치 않은 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+                    HttpStatus.INTERNAL_SERVER_ERROR.value()
+                )
+            )
     }
 }

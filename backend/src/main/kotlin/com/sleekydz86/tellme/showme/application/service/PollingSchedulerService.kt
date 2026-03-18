@@ -43,7 +43,7 @@ class PollingSchedulerService(
             if (ur?.updateId != null) {
                 maxId = max(maxId, ur.updateId + 1)
             }
-            ur?.message?.let { msg ->
+            ur?.incomingMessage()?.let { msg ->
                 handleUpdateService.handle(msg).subscribe(
                     { },
                     { e -> log.warn("Handle message error", e) }

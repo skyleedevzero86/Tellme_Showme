@@ -1,5 +1,6 @@
 package com.sleekydz86.tellme.global.config
 
+import com.sleekydz86.tellme.aiserver.infrastructure.web.RateLimitInterceptor
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry

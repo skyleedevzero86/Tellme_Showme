@@ -1,5 +1,6 @@
 package com.sleekydz86.tellme.global.crypto
 
+import com.sleekydz86.tellme.aiserver.aplication.port.EncryptionPort
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.security.SecureRandom
@@ -29,9 +30,9 @@ class AesEncryptionAdapter(
 
     override fun decrypt(cipher: String): String {
         val decoded = Base64.getDecoder().decode(cipher)
-        val c = Cipher.getInstance(algorithm)
-        c.init(Cipher.DECRYPT_MODE, keySpec)
-        return String(c.doFinal(decoded), Charsets.UTF_8)
+        val cipherInstance = Cipher.getInstance(algorithm)
+        cipherInstance.init(Cipher.DECRYPT_MODE, keySpec)
+        return String(cipherInstance.doFinal(decoded), Charsets.UTF_8)
     }
 
     override fun encryptBytes(plain: ByteArray): Pair<ByteArray, String> {

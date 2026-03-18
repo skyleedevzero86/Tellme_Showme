@@ -3,6 +3,8 @@ import type {
   WebhookInfoResponse,
   SendMessageResponse,
   GetUpdatesResponse,
+  MessageHistoryResponse,
+  FileHistoryResponse,
 } from '@/domain/types/api';
 import { ENDPOINTS } from '@/domain/constants/endpoints';
 
@@ -18,6 +20,16 @@ const buildUrl = (path: string): string => {
 };
 
 export const telegramApiRepository = {
+  async _readErrorMessage(res: Response): Promise<string> {
+    const ct = res.headers.get('content-type') ?? ''
+    if (ct.includes('application/json')) {
+      const body = await res.json().catch(() => null)
+      const msg = body?.message
+      if (typeof msg === 'string' && msg.trim() !== '') return msg
+    }
+    return res.statusText
+  },
+
   async getWebhookStatus(): Promise<{ webhookUrlConfigured: boolean; webhookUrl: string }> {
     const res = await fetch(buildUrl(ENDPOINTS.WEBHOOK_STATUS), { method: 'GET' });
     if (!res.ok) throw new Error(res.statusText);
@@ -82,7 +94,9 @@ export const telegramApiRepository = {
       method: 'POST',
       body: formData,
     });
-    if (!res.ok) throw new Error(res.statusText);
+    if (!res.ok) {
+      throw new Error(await this._readErrorMessage(res));
+    }
     return res.json();
   },
 
@@ -96,7 +110,42 @@ export const telegramApiRepository = {
       method: 'POST',
       body: formData,
     });
+    if (!res.ok) {
+      throw new Error(await this._readErrorMessage(res));
+    }
+    return res.json();
+  },
+
+  async getMessageHistory(
+    page: number = 0,
+    size: number = 20,
+    search?: string
+  ): Promise<MessageHistoryResponse> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (search != null && search.trim() !== '') params.set('search', search.trim());
+    const res = await fetch(`${buildUrl(ENDPOINTS.MESSAGE_HISTORY)}?${params.toString()}`);
     if (!res.ok) throw new Error(res.statusText);
     return res.json();
+  },
+
+  async getFileHistory(
+    page: number = 0,
+    size: number = 20,
+    search?: string
+  ): Promise<FileHistoryResponse> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (search != null && search.trim() !== '') params.set('search', search.trim());
+    const res = await fetch(`${buildUrl(ENDPOINTS.FILE_HISTORY)}?${params.toString()}`);
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  },
+
+  getMessageHistoryEventsUrl(): string {
+    return buildUrl(ENDPOINTS.MESSAGE_HISTORY_EVENTS);
+  },
+
+  getFilePreviewUrl(objectKey: string): string {
+    const params = new URLSearchParams({ objectKey });
+    return `${buildUrl(ENDPOINTS.FILE_PREVIEW)}?${params.toString()}`;
   },
 };

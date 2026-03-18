@@ -138,7 +138,7 @@ class TelegramWebClientAdapter(
     }
 
     private fun downloadFileByPathToLocal(filePath: String, suggestedFileName: String?): Mono<Path> {
-        val uri = getFileDownloadUri(filePath) ?: return Mono.error(IllegalStateException("uri is null"))
+        val uri = getFileDownloadUri(filePath) ?: return Mono.error(IllegalStateException("파일 다운로드 URL을 생성할 수 없습니다."))
         return telegramWebClient.get()
             .uri(uri)
             .retrieve()

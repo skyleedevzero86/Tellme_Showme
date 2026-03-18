@@ -20,7 +20,10 @@ class DocumentUploadEventHandler(
                 userId = event.userId,
                 fileName = event.fileName,
                 objectKey = event.objectKey,
-                contentType = event.contentType
+                contentType = event.contentType,
+                uploadSource = event.uploadSource,
+                telegramMessageId = event.telegramMessageId,
+                fromUserName = event.fromUserName
             )
         )
     }

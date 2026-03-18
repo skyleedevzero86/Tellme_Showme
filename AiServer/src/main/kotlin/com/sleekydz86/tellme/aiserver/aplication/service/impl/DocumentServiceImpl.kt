@@ -19,20 +19,21 @@ class DocumentServiceImpl(
     private val textSplitter = TokenTextSplitter()
 
     override fun loadText(resource: Resource, fileName: String, objectKey: String?): Result<Unit> = try {
-        val documentReader = TikaDocumentReader(resource)
-        val documents = documentReader.get()
+        val documents = TikaDocumentReader(resource).get()
         val objectKeyMeta = objectKey?.let { mapOf("objectKey" to it) } ?: emptyMap()
         val documentsWithMetadata = documents.map { doc ->
+            val text = doc.text.orEmpty()
             Document(
-                doc.content,
+                text,
                 doc.metadata + mapOf(
                     "fileName" to fileName,
                     "source" to resource.toString(),
                     "timestamp" to System.currentTimeMillis().toString(),
-                    "contentLength" to doc.content.length.toString()
+                    "contentLength" to text.length.toString()
                 ) + objectKeyMeta
             )
         }
+
         val splitDocuments = textSplitter.apply(documentsWithMetadata)
         vectorStore.add(splitDocuments)
         logger.info("문서 로드됨: fileName={}, chunks={}", fileName, splitDocuments.size)
@@ -43,8 +44,12 @@ class DocumentServiceImpl(
     }
 
     override fun doSearch(query: String): List<Document> = try {
-        val searchRequest = SearchRequest.query(query).withTopK(20).withSimilarityThreshold(0.01)
-        vectorStore.similaritySearch(searchRequest)
+        val searchRequest = SearchRequest.builder()
+            .query(query)
+            .topK(20)
+            .similarityThreshold(0.01)
+            .build()
+        vectorStore.similaritySearch(searchRequest) ?: emptyList()
     } catch (e: Exception) {
         logger.error("검색 실패: query={}", query, e)
         emptyList()
