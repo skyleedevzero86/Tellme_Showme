@@ -1,14 +1,17 @@
 package com.sleekydz86.tellme.showme.application.service
 
+import com.sleekydz86.tellme.showme.application.port.AiServerModeChatPort
 import com.sleekydz86.tellme.showme.application.port.AiServerTelegramPort
 import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
 import com.sleekydz86.tellme.showme.application.port.TelegramApiPort
 import com.sleekydz86.tellme.showme.application.service.handler.CommandHandler
+import com.sleekydz86.tellme.showme.application.service.handler.EndCommandHandler
 import com.sleekydz86.tellme.showme.application.service.handler.EchoCommandHandler
 import com.sleekydz86.tellme.showme.application.service.handler.EngCommandHandler
 import com.sleekydz86.tellme.showme.application.service.handler.GodCommandHandler
 import com.sleekydz86.tellme.showme.application.service.handler.HelpCommandHandler
 import com.sleekydz86.tellme.showme.application.service.handler.LottoCommandHandler
+import com.sleekydz86.tellme.showme.application.service.handler.SearchCommandHandler
 import com.sleekydz86.tellme.showme.application.service.handler.StartCommandHandler
 import com.sleekydz86.tellme.showme.application.service.handler.TimeCommandHandler
 import com.sleekydz86.tellme.showme.domain.BotCommand
@@ -25,6 +28,9 @@ class HandleUpdateService(
     private val telegramApi: TelegramApiPort,
     private val aiServerUpload: AiServerUploadPort,
     private val aiServerTelegram: AiServerTelegramPort,
+    private val aiServerModeChat: AiServerModeChatPort,
+    private val conversationModeStore: TelegramConversationModeStore,
+    private val timeAlarmService: TimeAlarmService,
     private val historySseService: HistorySseService,
     startHandler: StartCommandHandler?,
     timeHandler: TimeCommandHandler?,
@@ -32,6 +38,8 @@ class HandleUpdateService(
     lottoHandler: LottoCommandHandler?,
     godHandler: GodCommandHandler?,
     engHandler: EngCommandHandler?,
+    endHandler: EndCommandHandler?,
+    searchHandler: SearchCommandHandler?,
     echoHandler: EchoCommandHandler?
 ) {
     private val log = LoggerFactory.getLogger(HandleUpdateService::class.java)
@@ -43,7 +51,9 @@ class HandleUpdateService(
         BotCommand.HELP to helpHandler,
         BotCommand.LOTTO to lottoHandler,
         BotCommand.GOD to godHandler,
-        BotCommand.ENG to engHandler
+        BotCommand.ENG to engHandler,
+        BotCommand.END to endHandler,
+        BotCommand.SEARCH to searchHandler
     )
 
     init {
@@ -98,14 +108,41 @@ class HandleUpdateService(
             }
         }
 
-        val command = BotCommand.from(ctx.text)
-        val handler = (command?.let { commandHandlers[it] } ?: echoHandler) ?: return Mono.empty()
-        val replyMono = handler.handle(ctx) ?: return Mono.empty()
+        val replyMono = resolveReply(ctx)
 
         return saveMono
             .then(replyMono.flatMap { reply -> telegramApi.sendMessage(chatId, reply)!! })
             .then()
     }
+
+    private fun resolveReply(ctx: MessageContext): Mono<String> {
+        val command = BotCommand.from(ctx.text)
+        if (command != null) {
+            val handler = commandHandlers[command] ?: return Mono.empty()
+            return handler.handle(ctx) ?: Mono.empty()
+        }
+
+        val chatId = ctx.chatId ?: return echoHandler?.handle(ctx) ?: Mono.empty()
+        if (timeAlarmService.hasPendingSetup(chatId)) {
+            return Mono.just(timeAlarmService.continueSetup(chatId, ctx.text.orEmpty()))
+        }
+
+        val activeMode = conversationModeStore.get(chatId)
+        if (activeMode == null) {
+            return echoHandler?.handle(ctx) ?: Mono.empty()
+        }
+
+        val text = ctx.text.orEmpty()
+        if (isConversationExitText(text)) {
+            conversationModeStore.clear(chatId)
+            return Mono.just("${activeMode.label}를 종료했어요. 이제 원래 대화로 돌아왔습니다.")
+        }
+
+        return aiServerModeChat.chat(chatId.toString(), text, activeMode)
+    }
+
+    private fun isConversationExitText(text: String?): Boolean =
+        text?.trim()?.equals(EXIT_KEYWORD, ignoreCase = true) == true
 
     private fun handleDocument(chatId: Long, message: TelegramUpdate.Message): Mono<Void> {
         val document = message.document ?: return Mono.empty()
@@ -205,7 +242,7 @@ class HandleUpdateService(
                     val width = largest.width ?: 0
                     val height = largest.height ?: 0
                     val reply = if (saved) {
-                        "해상도 ${width}x${height} 사진을 받았습니다."
+                        "이미지 ${width}x${height} 사진을 받았습니다."
                     } else {
                         "사진 저장 중 오류가 발생했습니다."
                     }
@@ -238,6 +275,7 @@ class HandleUpdateService(
     }
 
     companion object {
+        private const val EXIT_KEYWORD = "bye"
         private const val FALLBACK_MESSAGE = "텍스트나 파일(문서/사진/음성/동영상)을 보내주세요."
     }
 }

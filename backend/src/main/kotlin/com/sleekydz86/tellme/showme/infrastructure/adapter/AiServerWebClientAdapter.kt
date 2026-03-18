@@ -1,24 +1,28 @@
 package com.sleekydz86.tellme.showme.infrastructure.adapter
 
 import com.sleekydz86.tellme.showme.application.port.AiServerHistoryPort
+import com.sleekydz86.tellme.showme.application.port.AiServerModeChatPort
+import com.sleekydz86.tellme.showme.application.port.AiServerSearchPort
 import com.sleekydz86.tellme.showme.application.port.AiServerTelegramPort
 import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
+import com.sleekydz86.tellme.showme.application.port.FilePreviewPayload
+import com.sleekydz86.tellme.showme.domain.ConversationMode
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.client.MultipartBodyBuilder
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
-import java.time.Instant
 import java.net.URLEncoder
+import java.time.Instant
 
 @Component
 class AiServerWebClientAdapter(
     @Qualifier("aiServerWebClient") private val webClient: WebClient
-) : AiServerUploadPort, AiServerTelegramPort, AiServerHistoryPort {
+) : AiServerUploadPort, AiServerTelegramPort, AiServerHistoryPort, AiServerSearchPort, AiServerModeChatPort {
     private val log = LoggerFactory.getLogger(AiServerWebClientAdapter::class.java)
 
     override fun upload(
@@ -105,6 +109,46 @@ class AiServerWebClientAdapter(
             }
     }
 
+    override fun search(userId: String, message: String): Mono<String> {
+        val body = mapOf(
+            "currentUserName" to userId,
+            "message" to message,
+            "useKnowledgeBase" to true
+        )
+        return webClient.post()
+            .uri("/chat/search")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(String::class.java)
+            .map { it.trim() }
+            .defaultIfEmpty("검색 결과가 비어 있습니다.")
+            .onErrorResume { e ->
+                log.warn("Failed to search in AiServer: userId={}", userId, e)
+                Mono.just("문서 검색 중 오류가 발생했습니다. AiServer 상태를 확인해 주세요.")
+            }
+    }
+
+    override fun chat(userId: String, message: String, mode: ConversationMode): Mono<String> {
+        val body = mapOf(
+            "currentUserName" to userId,
+            "message" to message,
+            "mode" to mode.aiMode
+        )
+        return webClient.post()
+            .uri("/chat/mode")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(String::class.java)
+            .map { it.trim() }
+            .map { if (it.isBlank()) "${mode.label} 응답이 비어 있습니다." else it }
+            .onErrorResume { e ->
+                log.warn("Failed to chat with AiServer mode: userId={}, mode={}", userId, mode.aiMode, e)
+                Mono.just("AiServer ${mode.label} 응답 중 오류가 발생했습니다. AiServer 상태를 확인해 주세요.")
+            }
+    }
+
     override fun getMessageHistory(page: Int, size: Int, search: String?): Mono<String> {
         val uri = buildHistoryUri("/api/telegram/messages", page, size, search)
         return webClient.get()
@@ -123,7 +167,7 @@ class AiServerWebClientAdapter(
             .defaultIfEmpty("{}")
     }
 
-    override fun getFilePreview(objectKey: String): Mono<com.sleekydz86.tellme.showme.application.port.FilePreviewPayload> {
+    override fun getFilePreview(objectKey: String): Mono<FilePreviewPayload> {
         val encodedObjectKey = URLEncoder.encode(objectKey, Charsets.UTF_8)
         return webClient.get()
             .uri("/api/telegram/files/preview?objectKey=$encodedObjectKey")
@@ -135,7 +179,7 @@ class AiServerWebClientAdapter(
                 val contentDisposition = response.headers().asHttpHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)
                 response.bodyToMono(ByteArray::class.java)
                     .map { bytes ->
-                        com.sleekydz86.tellme.showme.application.port.FilePreviewPayload(
+                        FilePreviewPayload(
                             bytes = bytes,
                             contentType = contentType,
                             contentDisposition = contentDisposition
@@ -146,7 +190,9 @@ class AiServerWebClientAdapter(
 
     private fun buildHistoryUri(path: String, page: Int, size: Int, search: String?): String {
         val params = mutableListOf("page=$page", "size=$size")
-        if (!search.isNullOrBlank()) params.add("search=${java.net.URLEncoder.encode(search, Charsets.UTF_8)}")
+        if (!search.isNullOrBlank()) {
+            params.add("search=${URLEncoder.encode(search, Charsets.UTF_8)}")
+        }
         return "$path?${params.joinToString("&")}"
     }
 }

@@ -6,13 +6,17 @@ enum class BotCommand(val value: String) {
     HELP("/help"),
     LOTTO("/lotto"),
     GOD("/god"),
-    ENG("/eng");
+    ENG("/eng"),
+    END("/end"),
+    SEARCH("/search");
 
     companion object {
         fun from(text: String?): BotCommand? {
             if (text == null || text.isBlank()) return null
-            val trimmed = text.trim()
-            return entries.find { it.value == trimmed }
+            val commandToken = text.trim()
+                .substringBefore(" ")
+                .substringBefore("@")
+            return entries.find { it.value == commandToken }
         }
     }
 }
