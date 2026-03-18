@@ -18,6 +18,16 @@ const buildUrl = (path: string): string => {
 };
 
 export const telegramApiRepository = {
+  async _readErrorMessage(res: Response): Promise<string> {
+    const ct = res.headers.get('content-type') ?? ''
+    if (ct.includes('application/json')) {
+      const body = await res.json().catch(() => null)
+      const msg = body?.message
+      if (typeof msg === 'string' && msg.trim() !== '') return msg
+    }
+    return res.statusText
+  },
+
   async getWebhookStatus(): Promise<{ webhookUrlConfigured: boolean; webhookUrl: string }> {
     const res = await fetch(buildUrl(ENDPOINTS.WEBHOOK_STATUS), { method: 'GET' });
     if (!res.ok) throw new Error(res.statusText);
@@ -82,7 +92,9 @@ export const telegramApiRepository = {
       method: 'POST',
       body: formData,
     });
-    if (!res.ok) throw new Error(res.statusText);
+    if (!res.ok) {
+      throw new Error(await this._readErrorMessage(res));
+    }
     return res.json();
   },
 
@@ -96,7 +108,9 @@ export const telegramApiRepository = {
       method: 'POST',
       body: formData,
     });
-    if (!res.ok) throw new Error(res.statusText);
+    if (!res.ok) {
+      throw new Error(await this._readErrorMessage(res));
+    }
     return res.json();
   },
 };

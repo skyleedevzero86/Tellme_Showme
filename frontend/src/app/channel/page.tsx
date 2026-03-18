@@ -1,4 +1,4 @@
-import { ChannelBroadcastPanel } from '@/presentation/components/ChannelBroadcastPanel';
+import { ChannelClient } from './ChannelClient';
 
 export default function ChannelPage() {
   return (
@@ -10,7 +10,7 @@ export default function ChannelPage() {
         <li>채널에 봇을 관리자로 추가한 뒤 @채널이름으로 설정합니다.</li>
       </ul>
       <br />
-      <ChannelBroadcastPanel />
+      <ChannelClient />
     </>
   );
 }
