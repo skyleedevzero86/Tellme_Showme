@@ -205,7 +205,7 @@ class HandleUpdateService(
                     val width = largest.width ?: 0
                     val height = largest.height ?: 0
                     val reply = if (saved) {
-                        "${width}x${height} 해상도 사진을 받았습니다."
+                        "해상도 ${width}x${height} 사진을 받았습니다."
                     } else {
                         "사진 저장 중 오류가 발생했습니다."
                     }
