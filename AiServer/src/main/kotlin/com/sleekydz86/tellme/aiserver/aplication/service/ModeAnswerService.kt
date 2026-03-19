@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service
 @Service
 class ModeAnswerService(
     private val chatClientProvider: ObjectProvider<ChatClient>,
+    private val localOllamaCompletionService: LocalOllamaCompletionService,
     private val domainEventPublisher: DomainEventPublisher,
     private val redisLockPort: RedisLockPort,
     private val redisQueuePort: RedisQueuePort,
@@ -73,7 +74,13 @@ class ModeAnswerService(
             return chatClient.prompt(mode.toPrompt(message)).call().content()?.trim().orEmpty()
         }
 
-        logger.warn("No ChatClient bean is configured for mode chat. Falling back to template response. mode={}", mode.modeName)
+        logger.warn("No ChatClient bean is configured for mode chat. Trying local Ollama generate API. mode={}", mode.modeName)
+        val ollamaResponse = localOllamaCompletionService.generate(mode.toPrompt(message).contents)
+        if (ollamaResponse.isNotBlank()) {
+            return ollamaResponse
+        }
+
+        logger.warn("Local Ollama generate API was unavailable. Falling back to template response. mode={}", mode.modeName)
         return mode.fallbackReply(message)
     }
 
