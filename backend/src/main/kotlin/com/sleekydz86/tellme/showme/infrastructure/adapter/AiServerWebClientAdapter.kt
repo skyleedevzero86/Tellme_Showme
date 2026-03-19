@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 import java.net.URLEncoder
+import java.time.Duration
 import java.time.Instant
 
 @Component
@@ -121,11 +122,12 @@ class AiServerWebClientAdapter(
             .bodyValue(body)
             .retrieve()
             .bodyToMono(String::class.java)
+            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
             .map { it.trim() }
-            .defaultIfEmpty("검색 결과가 비어 있습니다.")
+            .defaultIfEmpty(EMPTY_SEARCH_RESULT_MESSAGE)
             .onErrorResume { e ->
                 log.warn("Failed to search in AiServer: userId={}", userId, e)
-                Mono.just("문서 검색 중 오류가 발생했습니다. AiServer 상태를 확인해 주세요.")
+                Mono.just(SEARCH_ERROR_MESSAGE)
             }
     }
 
@@ -141,11 +143,12 @@ class AiServerWebClientAdapter(
             .bodyValue(body)
             .retrieve()
             .bodyToMono(String::class.java)
+            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
             .map { it.trim() }
-            .map { if (it.isBlank()) "${mode.label} 응답이 비어 있습니다." else it }
-            .onErrorResume { e ->
+            .filter { it.isNotBlank() }
+            .switchIfEmpty(Mono.error(IllegalStateException("AiServer mode reply is blank: mode=${mode.aiMode}")))
+            .doOnError { e ->
                 log.warn("Failed to chat with AiServer mode: userId={}, mode={}", userId, mode.aiMode, e)
-                Mono.just("AiServer ${mode.label} 응답 중 오류가 발생했습니다. AiServer 상태를 확인해 주세요.")
             }
     }
 
@@ -194,5 +197,13 @@ class AiServerWebClientAdapter(
             params.add("search=${URLEncoder.encode(search, Charsets.UTF_8)}")
         }
         return "$path?${params.joinToString("&")}"
+    }
+
+    companion object {
+        private val AI_SERVER_RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(10)
+        private const val EMPTY_SEARCH_RESULT_MESSAGE =
+            "\uac80\uc0c9 \uacb0\uacfc\uac00 \ube44\uc5b4 \uc788\uc2b5\ub2c8\ub2e4."
+        private const val SEARCH_ERROR_MESSAGE =
+            "\ubb38\uc11c \uac80\uc0c9 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4. AiServer \uc0c1\ud0dc\ub97c \ud655\uc778\ud574 \uc8fc\uc138\uc694."
     }
 }

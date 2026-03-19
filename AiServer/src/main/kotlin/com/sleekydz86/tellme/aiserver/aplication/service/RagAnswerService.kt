@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service
 @Service
 class RagAnswerService(
     private val chatClientProvider: ObjectProvider<ChatClient>,
+    private val localOllamaCompletionService: LocalOllamaCompletionService,
     private val documentService: DocumentService,
     private val documentUsageService: DocumentUsageService,
     private val documentUploadRepository: DocumentUploadRepository
@@ -85,7 +86,13 @@ class RagAnswerService(
             return chatClient.prompt(prompt).call().content()?.trim().orEmpty()
         }
 
-        logger.warn("No ChatClient bean is configured. Falling back to reference-only response.")
+        logger.warn("No ChatClient bean is configured. Trying local Ollama generate API.")
+        val ollamaResponse = localOllamaCompletionService.generate(prompt.contents)
+        if (ollamaResponse.isNotBlank()) {
+            return ollamaResponse
+        }
+
+        logger.warn("Local Ollama generate API was unavailable. Falling back to reference-only response.")
         if (searchResults.isEmpty()) {
             return ""
         }
