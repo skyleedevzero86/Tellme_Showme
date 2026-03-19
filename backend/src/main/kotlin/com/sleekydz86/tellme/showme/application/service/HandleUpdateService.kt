@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 import java.nio.file.Files
+import java.time.Duration
 import java.time.Instant
 
 @Service
@@ -139,11 +140,10 @@ class HandleUpdateService(
         }
 
         val chatId = ctx.chatId ?: return echoHandler?.handle(ctx) ?: Mono.empty()
-        if (timeAlarmService.hasPendingSetup(chatId)) {
+        val activeMode = conversationModeStore.get(chatId)
+        if (activeMode == null && timeAlarmService.hasPendingSetup(chatId)) {
             return Mono.just(timeAlarmService.continueSetup(chatId, ctx.text.orEmpty()))
         }
-
-        val activeMode = conversationModeStore.get(chatId)
         if (activeMode == null) {
             return echoHandler?.handle(ctx) ?: Mono.empty()
         }
@@ -156,6 +156,7 @@ class HandleUpdateService(
         }
 
         return aiServerModeChat.chat(chatId.toString(), text, activeMode)
+            .timeout(MODE_REPLY_TIMEOUT, Mono.just(buildModeFallbackReply(activeMode, text)))
             .onErrorResume { e ->
                 log.warn("Mode chat fallback activated: chatId={}, mode={}", chatId, activeMode.aiMode, e)
                 Mono.just(buildModeFallbackReply(activeMode, text))
@@ -318,6 +319,7 @@ class HandleUpdateService(
 
     companion object {
         private const val EXIT_KEYWORD = "bye"
+        private val MODE_REPLY_TIMEOUT: Duration = Duration.ofSeconds(3)
         private const val FALLBACK_MESSAGE = "텍스트나 파일(문서/사진/음성/동영상)을 보내주세요."
     }
 }

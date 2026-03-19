@@ -8,11 +8,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClientResponseException
-import reactor.core.publisher.Mono
-import kotlin.math.max
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-
+import kotlin.math.max
 
 @Service
 @RequiredArgsConstructor
@@ -24,65 +21,52 @@ class PollingSchedulerService(
 ) {
     private val log = LoggerFactory.getLogger(PollingSchedulerService::class.java)
     private var nextOffset: Long = 0
-    private val pollInProgress = AtomicBoolean(false)
     private val suspendedUntilEpochMs = AtomicLong(0)
 
     @Scheduled(fixedDelayString = "\${telegram.polling.fixed-delay-ms:500}")
     fun poll() {
         if (telegramApi.isTokenMissing) return
         if (System.currentTimeMillis() < suspendedUntilEpochMs.get()) return
-        if (!pollInProgress.compareAndSet(false, true)) return
-        if (!pollingGuard.tryAcquire(SCHEDULER_OWNER)) {
-            pollInProgress.set(false)
-            return
-        }
-        val mono = telegramApi.getUpdates(nextOffset)
-        if (mono == null) {
-            pollInProgress.set(false)
-            pollingGuard.release(SCHEDULER_OWNER)
-            return
-        }
-        mono.flatMap { update: TelegramUpdate -> processResult(update) }
-            .doFinally {
-                pollInProgress.set(false)
-                pollingGuard.release(SCHEDULER_OWNER)
+        if (!pollingGuard.tryAcquire(SCHEDULER_OWNER)) return
+
+        try {
+            val update = telegramApi.getUpdates(nextOffset)?.block() ?: return
+            nextOffset = processResult(update)
+            suspendedUntilEpochMs.set(0)
+        } catch (err: WebClientResponseException) {
+            if (err.statusCode.value() == 409) {
+                suspendPollingOnConflict(err)
+            } else {
+                log.error("Poll error", err)
             }
-            .subscribe(
-                { offset: Long ->
-                    nextOffset = offset
-                    suspendedUntilEpochMs.set(0)
-                },
-                { err -> handlePollError(err) }
-            )
+        } catch (err: Exception) {
+            log.error("Poll error", err)
+        } finally {
+            pollingGuard.release(SCHEDULER_OWNER)
+        }
     }
 
-    private fun processResult(update: TelegramUpdate): Mono<Long> {
+    private fun processResult(update: TelegramUpdate): Long {
         val resultList = update.result
         if (resultList.isNullOrEmpty()) {
-            val offset: Long = nextOffset
-            return Mono.just(offset)
+            return nextOffset
         }
-        var maxId: Long = nextOffset
-        for (ur in resultList) {
-            if (ur?.updateId != null) {
-                maxId = max(maxId, ur.updateId + 1)
-            }
-            ur?.incomingMessage()?.let { msg ->
-                handleUpdateService.handle(msg).subscribe(
-                    { },
-                    { e -> log.warn("Handle message error", e) }
-                )
-            }
-        }
-        return Mono.just(maxId)
-    }
 
-    private fun handlePollError(err: Throwable) {
-        if (err is WebClientResponseException && err.statusCode.value() == 409) {
-            suspendPollingOnConflict(err)
-            return
+        var maxId = nextOffset
+        for (updateResult in resultList) {
+            val updateId = updateResult?.updateId
+            if (updateId != null) {
+                maxId = max(maxId, updateId + 1)
+            }
+
+            val message = updateResult?.incomingMessage() ?: continue
+            try {
+                handleUpdateService.handle(message).block()
+            } catch (e: Exception) {
+                log.warn("Handle message error: updateId={}", updateId, e)
+            }
         }
-        log.error("Poll error", err)
+        return maxId
     }
 
     private fun suspendPollingOnConflict(err: WebClientResponseException) {
