@@ -93,7 +93,7 @@ class HandleUpdateService(
         val fromUserName = message.senderDisplayName() ?: fallbackFromName
         val receivedAt = message.date?.let { Instant.ofEpochSecond(it) } ?: Instant.now()
 
-        val saveMono = aiServerTelegram.saveMessage(
+        aiServerTelegram.saveMessage(
             telegramMessageId = messageId,
             chatId = chatId,
             fromUserId = fromUserId,
@@ -106,12 +106,28 @@ class HandleUpdateService(
             } else {
                 historySseService.publishMessageSaved()
             }
-        }
+        }.onErrorResume { e ->
+            log.warn("Telegram message history save error: chatId={}, messageId={}", chatId, messageId, e)
+            Mono.just(false)
+        }.subscribe()
 
         val replyMono = resolveReply(ctx)
+            .onErrorResume { e ->
+                log.warn("Reply generation failed: chatId={}, messageId={}", chatId, messageId, e)
+                Mono.just(
+                    ctx.text?.takeIf { it.isNotBlank() }
+                        ?: "메시지를 받았지만 답변을 만들지 못했습니다. 다시 말씀해 주세요."
+                )
+            }
+            .switchIfEmpty(
+                Mono.just(
+                    ctx.text?.takeIf { it.isNotBlank() }
+                        ?: "메시지를 받았지만 답변을 만들지 못했습니다. 다시 말씀해 주세요."
+                )
+            )
 
-        return saveMono
-            .then(replyMono.flatMap { reply -> telegramApi.sendMessage(chatId, reply)!! })
+        return replyMono
+            .flatMap { reply -> telegramApi.sendMessage(chatId, reply)!! }
             .then()
     }
 
@@ -133,16 +149,42 @@ class HandleUpdateService(
         }
 
         val text = ctx.text.orEmpty()
+        log.info("Routing text to active conversation mode: chatId={}, mode={}, text={}", chatId, activeMode.aiMode, text)
         if (isConversationExitText(text)) {
             conversationModeStore.clear(chatId)
             return Mono.just("${activeMode.label}를 종료했어요. 이제 원래 대화로 돌아왔습니다.")
         }
 
         return aiServerModeChat.chat(chatId.toString(), text, activeMode)
+            .onErrorResume { e ->
+                log.warn("Mode chat fallback activated: chatId={}, mode={}", chatId, activeMode.aiMode, e)
+                Mono.just(buildModeFallbackReply(activeMode, text))
+            }
     }
 
     private fun isConversationExitText(text: String?): Boolean =
         text?.trim()?.equals(EXIT_KEYWORD, ignoreCase = true) == true
+
+    private fun buildModeFallbackReply(mode: com.sleekydz86.tellme.showme.domain.ConversationMode, text: String): String {
+        val normalized = text.trim()
+        return when (mode) {
+            com.sleekydz86.tellme.showme.domain.ConversationMode.ENG -> when {
+                normalized.isBlank() -> "Tell me a little more. I will keep replying in English."
+                normalized.endsWith("?") -> "That is a thoughtful question. Let us take it one step at a time."
+                else -> "I hear you. Keep going, one sentence at a time, and I will stay with you in English."
+            }
+
+            com.sleekydz86.tellme.showme.domain.ConversationMode.GOD -> when {
+                normalized.isBlank() -> "작은 빛도 어둠을 밀어냅니다.\n천천히 마음을 가다듬고 다시 이야기해 보세요."
+                normalized.contains("힘들") || normalized.contains("외롭") ->
+                    "상처를 견디는 마음에도 내일의 빛은 찾아옵니다.\n오늘의 아픔이 당신의 전부는 아니니, 한 걸음만 더 버텨 보세요."
+                normalized.contains("불안") || normalized.contains("걱정") ->
+                    "마음이 흔들릴수록 호흡을 고르게 하십시오.\n결론을 서두르지 말고, 오늘 할 수 있는 한 가지에 집중해 보세요."
+                else ->
+                    "천천히 가도 멈추지 않으면 앞으로 갑니다.\n지금의 고민도 한 걸음씩 풀어가면 길이 보일 것입니다."
+            }
+        }
+    }
 
     private fun handleDocument(chatId: Long, message: TelegramUpdate.Message): Mono<Void> {
         val document = message.document ?: return Mono.empty()

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 import java.net.URLEncoder
+import java.time.Duration
 import java.time.Instant
 
 @Component
@@ -121,6 +122,7 @@ class AiServerWebClientAdapter(
             .bodyValue(body)
             .retrieve()
             .bodyToMono(String::class.java)
+            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
             .map { it.trim() }
             .defaultIfEmpty("검색 결과가 비어 있습니다.")
             .onErrorResume { e ->
@@ -141,6 +143,7 @@ class AiServerWebClientAdapter(
             .bodyValue(body)
             .retrieve()
             .bodyToMono(String::class.java)
+            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
             .map { it.trim() }
             .map { if (it.isBlank()) "${mode.label} 응답이 비어 있습니다." else it }
             .onErrorResume { e ->
@@ -194,5 +197,9 @@ class AiServerWebClientAdapter(
             params.add("search=${URLEncoder.encode(search, Charsets.UTF_8)}")
         }
         return "$path?${params.joinToString("&")}"
+    }
+
+    companion object {
+        private val AI_SERVER_RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(10)
     }
 }
