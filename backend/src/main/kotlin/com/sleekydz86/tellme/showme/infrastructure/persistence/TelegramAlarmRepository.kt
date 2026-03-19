@@ -5,4 +5,5 @@ import java.time.LocalDateTime
 
 interface TelegramAlarmRepository : JpaRepository<TelegramAlarmEntity, Long> {
     fun findByActiveTrueAndNextTriggerAtLessThanEqualOrderByNextTriggerAtAsc(now: LocalDateTime): List<TelegramAlarmEntity>
+    fun findByChatIdAndActiveTrue(chatId: Long): List<TelegramAlarmEntity>
 }

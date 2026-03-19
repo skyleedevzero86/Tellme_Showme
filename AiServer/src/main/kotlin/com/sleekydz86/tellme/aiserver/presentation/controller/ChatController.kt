@@ -44,6 +44,16 @@ class ChatController(
         )
     }
 
+    @PostMapping("/reply", produces = [MediaType.TEXT_PLAIN_VALUE])
+    fun chatReply(@RequestBody body: ChatSendRequest): String {
+        return ragAnswerService.answer(
+            currentUserName = body.currentUserName,
+            question = body.message,
+            useKnowledgeBase = body.useKnowledgeBase,
+            strictKnowledgeBase = false
+        )
+    }
+
     @PostMapping("/mode", produces = [MediaType.TEXT_PLAIN_VALUE])
     fun chatMode(@RequestBody body: ModeChatRequest): String {
         return modeAnswerService.answer(

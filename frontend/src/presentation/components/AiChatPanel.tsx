@@ -8,10 +8,10 @@ type AiChatPanelProps = {
 };
 
 const statusText: Record<'idle' | 'connecting' | 'streaming' | 'error', string> = {
-  idle: '대기 중',
-  connecting: 'AiServer 연결 중',
-  streaming: '응답 스트리밍 중',
-  error: '연결 오류',
+  idle: 'Ready',
+  connecting: 'Creating reply',
+  streaming: 'Receiving reply',
+  error: 'Connection error',
 };
 
 export function AiChatPanel({ enabled }: AiChatPanelProps) {
@@ -36,9 +36,11 @@ export function AiChatPanel({ enabled }: AiChatPanelProps) {
     <section className="card stack ai-chat-panel">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <div className="stack" style={{ gap: 4 }}>
-          <strong>AiServer 대화</strong>
+          <strong>Unified Chat Input</strong>
           <span className="muted" style={{ fontSize: 13 }}>
-            시작 버튼을 누른 뒤 질문을 보내면 `http://localhost:6060`의 AiServer와 대화합니다.
+            This panel uses the same parser as Telegram. You can test normal chat and commands like
+            {' '}
+            <code>/god</code>, <code>/eng</code>, and <code>/search</code> here.
           </span>
         </div>
         <div className="row">
@@ -46,14 +48,14 @@ export function AiChatPanel({ enabled }: AiChatPanelProps) {
             {statusText[status]}
           </span>
           <button type="button" onClick={resetConversation} disabled={isLoading}>
-            초기화
+            Reset
           </button>
         </div>
       </div>
 
       {!enabled && (
         <p className="notice notice-warning">
-          위의 시작 버튼을 한 번 눌러야 AI 대화 입력창이 활성화됩니다.
+          Start the chat first. Once enabled, the frontend will follow the same input flow as Telegram.
         </p>
       )}
 
@@ -64,7 +66,7 @@ export function AiChatPanel({ enabled }: AiChatPanelProps) {
             className={`ai-chat-message ${message.role === 'user' ? 'ai-chat-message-user' : 'ai-chat-message-assistant'}`}
           >
             <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
-              {message.role === 'user' ? '나' : 'AI'}
+              {message.role === 'user' ? 'You' : 'AI'}
             </div>
             <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
           </div>
@@ -74,7 +76,7 @@ export function AiChatPanel({ enabled }: AiChatPanelProps) {
             <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
               AI
             </div>
-            <div className="ai-chat-typing">응답을 작성하고 있습니다...</div>
+            <div className="ai-chat-typing">Creating a reply...</div>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -94,13 +96,13 @@ export function AiChatPanel({ enabled }: AiChatPanelProps) {
           disabled={!enabled || isLoading}
           placeholder={
             enabled
-              ? 'AiServer에 물어볼 내용을 입력하세요. Enter로 전송, Shift+Enter로 줄바꿈.'
-              : '먼저 위의 시작 버튼을 눌러 주세요.'
+              ? 'Try normal chat or commands like /god, /eng, and /search. Press Enter to send and Shift+Enter for a new line.'
+              : 'Start the chat to enable input.'
           }
           className="ai-chat-input"
         />
         <button type="button" onClick={handleSend} disabled={!enabled || isLoading || draft.trim() === ''}>
-          전송
+          Send
         </button>
       </div>
     </section>

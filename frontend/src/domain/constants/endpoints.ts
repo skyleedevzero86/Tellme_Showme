@@ -11,4 +11,5 @@ export const ENDPOINTS = {
   FILE_HISTORY: 'file_history.do',
   FILE_PREVIEW: 'file_preview.do',
   MESSAGE_HISTORY_EVENTS: 'message_history_events.do',
+  CHAT_INPUT: 'chat_input.do',
 } as const;

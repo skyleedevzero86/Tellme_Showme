@@ -10,7 +10,7 @@ class TimeCommandHandler(
     private val timeAlarmService: TimeAlarmService
 ) : CommandHandler {
     override fun handle(ctx: MessageContext?): Mono<String> {
-        val chatId = ctx?.chatId ?: return Mono.just("채팅 정보를 찾지 못했습니다.")
+        val chatId = ctx?.chatId ?: return Mono.just("채팅 정보를 찾지 못했어요.")
         return Mono.just(timeAlarmService.startSetup(chatId))
     }
 }

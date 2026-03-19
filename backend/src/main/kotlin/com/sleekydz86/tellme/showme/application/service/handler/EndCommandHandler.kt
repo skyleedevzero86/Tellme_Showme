@@ -16,25 +16,26 @@ class EndCommandHandler(
         val chatId = ctx?.chatId ?: return Mono.just(NO_ACTIVE_STATE_MESSAGE)
         val mode = conversationModeStore.clear(chatId)
         val alarmSetupCancelled = timeAlarmService.cancelSetup(chatId)
+        val stoppedAlarmCount = if (ctx.supportsAlarmSetup()) timeAlarmService.stopActiveAlarms(chatId) else 0
 
-        val reply = when {
-            mode != null && alarmSetupCancelled ->
-                "${mode.label}와 알람 설정을 종료했어요. 이제 원래 대화로 돌아왔습니다."
-
-            mode != null ->
-                "${mode.label}를 종료했어요. 이제 원래 대화로 돌아왔습니다."
-
-            alarmSetupCancelled ->
-                "알람 설정을 종료했어요."
-
-            else ->
-                NO_ACTIVE_STATE_MESSAGE
-        }
+        val reply = buildString {
+            if (mode != null) {
+                append("${mode.label}를 종료했어요.")
+            }
+            if (alarmSetupCancelled) {
+                if (isNotEmpty()) append(" ")
+                append("알람 설정을 취소했어요.")
+            }
+            if (stoppedAlarmCount > 0) {
+                if (isNotEmpty()) append(" ")
+                append("활성 알람 ${stoppedAlarmCount}개도 함께 중지했어요.")
+            }
+        }.ifBlank { NO_ACTIVE_STATE_MESSAGE }
 
         return Mono.just(reply)
     }
 
     companion object {
-        private const val NO_ACTIVE_STATE_MESSAGE = "현재 종료할 대화나 알람 설정이 없습니다."
+        private const val NO_ACTIVE_STATE_MESSAGE = "현재 종료할 대화나 알람 설정이 없어요."
     }
 }
