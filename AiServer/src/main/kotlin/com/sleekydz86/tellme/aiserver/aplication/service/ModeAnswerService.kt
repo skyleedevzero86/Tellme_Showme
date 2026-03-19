@@ -24,7 +24,7 @@ class ModeAnswerService(
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun answer(currentUserName: String, message: String, mode: String): String {
+    fun answer(currentUserName: String, message: String, mode: String, replyContext: String? = null): String {
         val conversationMode = AssistantConversationMode.from(mode)
             ?: return UNSUPPORTED_MODE_MESSAGE
 
@@ -41,7 +41,7 @@ class ModeAnswerService(
         var answer = ""
         val ran = redisLockPort.withLock("chat:$currentUserName", 30L) {
             answer = try {
-                generateResponse(conversationMode, normalizedMessage)
+                generateResponse(conversationMode, normalizedMessage, replyContext)
                     .ifBlank { conversationMode.fallbackReply(normalizedMessage) }
             } catch (error: Exception) {
                 logger.error(
@@ -63,25 +63,106 @@ class ModeAnswerService(
             answer = conversationMode.fallbackReply(normalizedMessage)
         }
 
+        answer = ensureModeLanguage(conversationMode, normalizedMessage, answer)
         domainEventPublisher.publish(ChatResponseGenerated(currentUserName, answer.length, conversationMode.modeName))
         redisQueuePort.pushChatSaveJob(currentUserName, normalizedMessage, answer, conversationMode.modeName)
         return answer
     }
 
-    private fun generateResponse(mode: AssistantConversationMode, message: String): String {
+    private fun generateResponse(mode: AssistantConversationMode, message: String, replyContext: String?): String {
+        val prompt = if (mode != AssistantConversationMode.ENG && !replyContext.isNullOrBlank() && isClarificationRequest(message)) {
+            Prompt(
+                """
+                You are helping a Korean user understand a previous assistant message from ${mode.modeName} mode.
+                The user is replying to that previous message and asking what it means.
+                Explain the previous message directly in plain Korean.
+                If the previous message contains Chinese, mixed language, or broken wording, rewrite its intended meaning in natural Korean.
+                Do not create a new quote or proverb in this case. Focus on explaining the replied message.
+                Reply only in Korean.
+
+                Previous message:
+                $replyContext
+
+                User follow-up:
+                $message
+                """.trimIndent()
+            )
+        } else {
+            mode.toPrompt(message, replyContext)
+        }
+
         val chatClient = chatClientProvider.ifAvailable
         if (chatClient != null) {
-            return chatClient.prompt(mode.toPrompt(message)).call().content()?.trim().orEmpty()
+            return chatClient.prompt(prompt).call().content()?.trim().orEmpty()
         }
 
         logger.warn("No ChatClient bean is configured for mode chat. Trying local Ollama generate API. mode={}", mode.modeName)
-        val ollamaResponse = localOllamaCompletionService.generate(mode.toPrompt(message).contents)
+        val ollamaResponse = localOllamaCompletionService.generate(prompt.contents)
         if (ollamaResponse.isNotBlank()) {
             return ollamaResponse
         }
 
         logger.warn("Local Ollama generate API was unavailable. Falling back to template response. mode={}", mode.modeName)
         return mode.fallbackReply(message)
+    }
+
+    private fun ensureModeLanguage(mode: AssistantConversationMode, message: String, rawReply: String): String {
+        val trimmed = rawReply.trim()
+        if (trimmed.isBlank()) {
+            return mode.fallbackReply(message)
+        }
+        if (mode == AssistantConversationMode.ENG) {
+            return trimmed
+        }
+        if (containsHangul(trimmed)) {
+            return trimmed
+        }
+
+        logger.warn("Non-Korean mode reply detected. Rewriting to Korean. mode={}", mode.modeName)
+        val rewritten = localOllamaCompletionService.generate(
+            """
+            Rewrite the following assistant reply in natural Korean.
+            Reply only in Korean.
+            Do not use Chinese.
+            Preserve the original meaning and keep it concise.
+
+            User message:
+            $message
+
+            Assistant draft:
+            $trimmed
+            """.trimIndent()
+        ).trim()
+
+        return if (rewritten.isNotBlank() && containsHangul(rewritten)) {
+            rewritten
+        } else {
+            mode.fallbackReply(message)
+        }
+    }
+
+    private fun containsHangul(text: String): Boolean =
+        text.any { ch -> ch in '\uAC00'..'\uD7A3' || ch in '\u3131'..'\u318E' }
+
+    private fun isClarificationRequest(message: String): Boolean {
+        val normalized = message.lowercase()
+        return listOf(
+            "무슨말",
+            "무슨 말",
+            "뭔말",
+            "무슨뜻",
+            "무슨 뜻",
+            "설명해",
+            "설명 좀",
+            "쉽게 말",
+            "쉽게 설명",
+            "다시 말",
+            "다시 설명",
+            "번역해",
+            "이게 뭐",
+            "이건 뭐",
+            "무슨 이야기"
+        ).any { normalized.contains(it) }
     }
 
     private enum class AssistantConversationMode(
@@ -99,26 +180,32 @@ class ModeAnswerService(
                 If the user writes in Korean, still answer in English.
 
                 User message:
-                {message}
+                {replyContext}{message}
             """.trimIndent()
         ),
         GOD(
             modeName = "god",
-            emptyMessage = "명언 느낌으로 답할 주제를 입력해 주세요.",
+            emptyMessage = "명언 모드로 대화할 내용을 입력해 주세요.",
             promptTemplate = """
-                You are a warm inspirational assistant.
-                Reply in Korean.
+                You are a warm inspirational assistant for a Korean user.
+                Reply only in natural Korean.
+                Never answer in Chinese.
                 Start with one short quote, proverb, or wisdom sentence.
                 After that, add one or two short lines that connect the quote to the user's message.
                 Keep it gentle, concise, and uplifting.
+                If the user is replying to a previous message and asking what it means, explain that previous message directly instead of giving a new quote.
 
                 User message:
-                {message}
+                {replyContext}{message}
             """.trimIndent()
         );
 
-        fun toPrompt(message: String): Prompt =
-            Prompt(promptTemplate.replace("{message}", message))
+        fun toPrompt(message: String, replyContext: String?): Prompt =
+            Prompt(
+                promptTemplate
+                    .replace("{replyContext}", replyContextSection(replyContext))
+                    .replace("{message}", message)
+            )
 
         fun fallbackReply(message: String): String =
             when (this) {
@@ -130,25 +217,30 @@ class ModeAnswerService(
             fun from(mode: String): AssistantConversationMode? =
                 entries.find { it.modeName.equals(mode.trim(), ignoreCase = true) }
 
+            private fun replyContextSection(replyContext: String?): String =
+                replyContext?.trim()?.takeIf { it.isNotBlank() }
+                    ?.let { "Previous replied message:\n$it\n\n" }
+                    .orEmpty()
+
             private fun buildFallbackEnglishReply(message: String): String {
                 val normalized = message.trim()
                 return when {
                     normalized.endsWith("?") ->
-                        "That's a thoughtful question. My short answer is to take it step by step and keep moving forward."
+                        "That is a thoughtful question. Let us work through it step by step."
 
                     normalized.length <= 12 ->
                         "I hear you. Tell me a little more, and I will keep replying in English."
 
                     else ->
-                        "Thanks for sharing. Let's keep talking in English, one step at a time."
+                        "Thanks for sharing. Let us keep talking in English, one step at a time."
                 }
             }
 
             private fun buildFallbackGodReply(message: String): String {
                 val quotes = listOf(
                     "작은 걸음도 멈추지 않으면 결국 길이 됩니다.",
-                    "비 온 뒤에 땅이 굳듯, 어려움 뒤에는 단단함이 남습니다.",
-                    "오늘의 인내가 내일의 힘이 됩니다.",
+                    "비가 온 뒤에 땅이 굳듯, 어려움 뒤에는 단단함이 남습니다.",
+                    "오늘의 버팀이 내일의 힘이 됩니다.",
                     "천천히 가도 멈추지 않으면 앞으로 갑니다."
                 )
                 val quote = quotes[(message.hashCode() and Int.MAX_VALUE) % quotes.size]

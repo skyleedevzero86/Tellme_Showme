@@ -1,5 +1,6 @@
 package com.sleekydz86.tellme.showme.infrastructure.adapter
 
+import com.sleekydz86.tellme.global.config.AiServerProperties
 import com.sleekydz86.tellme.showme.application.port.AiServerHistoryPort
 import com.sleekydz86.tellme.showme.application.port.AiServerModeChatPort
 import com.sleekydz86.tellme.showme.application.port.AiServerReplyPort
@@ -23,9 +24,11 @@ import java.time.Instant
 
 @Component
 class AiServerWebClientAdapter(
-    @Qualifier("aiServerWebClient") private val webClient: WebClient
+    @Qualifier("aiServerWebClient") private val webClient: WebClient,
+    aiServerProperties: AiServerProperties
 ) : AiServerUploadPort, AiServerTelegramPort, AiServerHistoryPort, AiServerSearchPort, AiServerModeChatPort, AiServerReplyPort {
     private val log = LoggerFactory.getLogger(AiServerWebClientAdapter::class.java)
+    private val aiServerResponseTimeout: Duration = Duration.ofSeconds(aiServerProperties.responseTimeoutSeconds)
 
     override fun upload(
         bytes: ByteArray,
@@ -123,7 +126,7 @@ class AiServerWebClientAdapter(
             .bodyValue(body)
             .retrieve()
             .bodyToMono(String::class.java)
-            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
+            .timeout(aiServerResponseTimeout)
             .map { it.trim() }
             .defaultIfEmpty(EMPTY_SEARCH_RESULT_MESSAGE)
             .onErrorResume { e ->
@@ -132,19 +135,20 @@ class AiServerWebClientAdapter(
             }
     }
 
-    override fun chat(userId: String, message: String, mode: ConversationMode): Mono<String> {
-        val body = mapOf(
+    override fun chat(userId: String, message: String, mode: ConversationMode, replyContext: String?): Mono<String> {
+        val body = linkedMapOf(
             "currentUserName" to userId,
             "message" to message,
             "mode" to mode.aiMode
         )
+        replyContext?.takeIf { it.isNotBlank() }?.let { body["replyContext"] = it }
         return webClient.post()
             .uri("/chat/mode")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(body)
             .retrieve()
             .bodyToMono(String::class.java)
-            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
+            .timeout(aiServerResponseTimeout)
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .switchIfEmpty(Mono.error(IllegalStateException("AiServer mode reply is blank: mode=${mode.aiMode}")))
@@ -153,19 +157,20 @@ class AiServerWebClientAdapter(
             }
     }
 
-    override fun reply(userId: String, message: String): Mono<String> {
-        val body = mapOf(
+    override fun reply(userId: String, message: String, replyContext: String?): Mono<String> {
+        val body = linkedMapOf(
             "currentUserName" to userId,
             "message" to message,
             "useKnowledgeBase" to false
         )
+        replyContext?.takeIf { it.isNotBlank() }?.let { body["replyContext"] = it }
         return webClient.post()
             .uri("/chat/reply")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(body)
             .retrieve()
             .bodyToMono(String::class.java)
-            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
+            .timeout(aiServerResponseTimeout)
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .switchIfEmpty(Mono.error(IllegalStateException("AiServer reply is blank")))
@@ -222,7 +227,6 @@ class AiServerWebClientAdapter(
     }
 
     companion object {
-        private val AI_SERVER_RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(10)
         private const val EMPTY_SEARCH_RESULT_MESSAGE =
             "\uac80\uc0c9 \uacb0\uacfc\uac00 \ube44\uc5b4 \uc788\uc2b5\ub2c8\ub2e4."
         private const val SEARCH_ERROR_MESSAGE =

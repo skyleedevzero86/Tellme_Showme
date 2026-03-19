@@ -163,29 +163,32 @@ class HandleUpdateService(
 
         if (activeMode == null) {
             val text = ctx.text.orEmpty()
+            val replyContext = ctx.replyContextSummary()
             log.info(
-                "Routing general chat text to AI reply: chatId={}, chatType={}, source={}, text={}",
+                "Routing general chat text to AI reply: chatId={}, chatType={}, source={}, hasReplyContext={}, text={}",
                 chatId,
                 ctx.chatType,
                 ctx.inputSource,
+                ctx.hasReplyContext(),
                 text
             )
-            return aiServerReply.reply(chatId.toString(), text)
-                .timeout(PRIVATE_CHAT_REPLY_TIMEOUT, Mono.just(privateChatReplyFallbackFactory.build(text)))
+            return aiServerReply.reply(chatId.toString(), text, replyContext)
+                .timeout(PRIVATE_CHAT_REPLY_TIMEOUT, Mono.just(privateChatReplyFallbackFactory.build(text, replyContext)))
                 .onErrorResume { e ->
                     log.warn("General chat fallback activated: chatId={}, chatType={}, source={}", chatId, ctx.chatType, ctx.inputSource, e)
-                    Mono.just(privateChatReplyFallbackFactory.build(text))
+                    Mono.just(privateChatReplyFallbackFactory.build(text, replyContext))
                 }
         }
 
         val text = ctx.text.orEmpty()
-        log.info("Routing text to active conversation mode: chatId={}, mode={}, text={}", chatId, activeMode.aiMode, text)
+        val replyContext = ctx.replyContextSummary()
+        log.info("Routing text to active conversation mode: chatId={}, mode={}, hasReplyContext={}, text={}", chatId, activeMode.aiMode, ctx.hasReplyContext(), text)
         if (isConversationExitText(text)) {
             conversationModeStore.clear(chatId)
             return Mono.just("${activeMode.label} ended. Returning to normal conversation.")
         }
 
-        return aiServerModeChat.chat(chatId.toString(), text, activeMode)
+        return aiServerModeChat.chat(chatId.toString(), text, activeMode, replyContext)
             .timeout(MODE_REPLY_TIMEOUT, Mono.just(fallbackReplyFactory.build(activeMode, text)))
             .onErrorResume { e ->
                 log.warn("Mode chat fallback activated: chatId={}, mode={}", chatId, activeMode.aiMode, e)
@@ -328,8 +331,8 @@ class HandleUpdateService(
 
     companion object {
         private const val EXIT_KEYWORD = "bye"
-        private val MODE_REPLY_TIMEOUT: Duration = Duration.ofSeconds(3)
-        private val PRIVATE_CHAT_REPLY_TIMEOUT: Duration = Duration.ofSeconds(8)
+        private val MODE_REPLY_TIMEOUT: Duration = Duration.ofSeconds(45)
+        private val PRIVATE_CHAT_REPLY_TIMEOUT: Duration = Duration.ofSeconds(45)
         private const val DEFAULT_REPLY_MESSAGE = "답변을 만드는 데 문제가 있었어요. 한 번만 다시 말씀해 주세요."
         private const val FALLBACK_MESSAGE = "텍스트나 파일(문서/사진/음성/동영상)을 보내 주세요."
     }

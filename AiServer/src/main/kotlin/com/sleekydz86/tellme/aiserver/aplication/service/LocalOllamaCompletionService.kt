@@ -11,7 +11,7 @@ class LocalOllamaCompletionService(
     @Value("\${spring.ai.ollama.base-url:http://localhost:11434}") baseUrl: String,
     @param:Value("\${spring.ai.ollama.chat.model:qwen2.5:7b-instruct}") private val model: String,
     @param:Value("\${spring.ai.ollama.chat.options.temperature:0.7}") private val temperature: Double,
-    @param:Value("\${spring.ai.ollama.chat.options.num_predict:1000}") private val numPredict: Int
+    @param:Value("\${spring.ai.ollama.chat.options.num_predict:256}") private val numPredict: Int
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)

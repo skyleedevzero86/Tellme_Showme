@@ -57,6 +57,9 @@ class TelegramUpdate {
         @JsonProperty("text")
         val text: String? = null
 
+        @JsonProperty("reply_to_message")
+        val replyToMessage: Message? = null
+
         @JsonProperty("document")
         val document: Document? = null
 

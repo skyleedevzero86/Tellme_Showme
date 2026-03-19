@@ -5,64 +5,52 @@ import org.springframework.stereotype.Component
 @Component
 class PrivateChatReplyFallbackFactory {
 
-    fun build(text: String): String {
+    fun build(text: String, replyContext: String? = null): String {
         val normalized = text.trim()
-        return if (prefersEnglish(normalized)) {
-            buildEnglishReply(normalized)
-        } else {
-            buildKoreanReply(normalized)
-        }
-    }
+        val hasReplyContext = !replyContext.isNullOrBlank()
 
-    private fun buildKoreanReply(text: String): String =
-        when {
-            text.isBlank() ->
-                "마음에 걸리는 내용 한 문장만 더 말해 주세요. 바로 이어서 도와드릴게요."
+        return when {
+            normalized.isBlank() ->
+                "한 문장만 편하게 보내 주세요. 바로 이어서 도와드릴게요."
 
-            text.contains("영어", ignoreCase = true) ->
-                "알겠어요. 이제 영어로 자연스럽게 이어서 대화할게요. 하고 싶은 말을 계속 보내 주세요."
+            hasReplyContext && isClarificationRequest(normalized) ->
+                "방금 답장한 내용을 다시 쉽게 풀어드릴게요. 특히 헷갈린 문장을 한 번만 더 짚어 주시면 그 부분부터 정확히 설명할게요."
 
-            text.endsWith("?") ||
-                text.contains("왜") ||
-                text.contains("어떻게") ||
-                text.contains("뭐") ->
+            normalized.contains("배고파") ->
+                "배고프시군요. 지금 바로 먹을 수 있는 게 있는지부터 먼저 챙겨 보세요. 원하시면 간단한 메뉴도 같이 골라드릴게요."
+
+            normalized.contains("코드") || normalized.contains("버그") || normalized.contains("에러") ->
+                "코드 관련 질문이라면 언어, 에러 메시지, 기대한 동작 중 하나만 더 알려 주세요. 그러면 더 정확하게 도와드릴게요."
+
+            normalized.contains("힘들") || normalized.contains("지쳐") || normalized.contains("슬프") ->
+                "많이 버거우셨겠어요. 지금 가장 크게 걸리는 부분부터 편하게 말해 주세요."
+
+            normalized.endsWith("?") || normalized.contains("왜") || normalized.contains("어떻게") || normalized.contains("뭐") ->
                 "좋은 질문이에요. 핵심부터 차근차근 같이 풀어볼게요."
-
-            text.contains("힘들", ignoreCase = true) ||
-                text.contains("외롭", ignoreCase = true) ||
-                text.contains("슬프", ignoreCase = true) ||
-                text.contains("지쳤", ignoreCase = true) ||
-                text.contains("불안", ignoreCase = true) ->
-                "많이 버거우셨겠어요. 지금 제일 크게 걸리는 부분부터 편하게 말해 주세요."
 
             else ->
                 "계속 듣고 있어요. 더 이어서 말해 주시면 그 내용에 맞춰 바로 답할게요."
         }
-
-    private fun buildEnglishReply(text: String): String =
-        when {
-            text.isBlank() ->
-                "Tell me one more sentence about what is on your mind, and I will keep helping."
-
-            text.endsWith("?") ->
-                "That is a good question. Let us unpack it step by step."
-
-            text.contains("tired", ignoreCase = true) ||
-                text.contains("lonely", ignoreCase = true) ||
-                text.contains("hard", ignoreCase = true) ||
-                text.contains("sad", ignoreCase = true) ->
-                "That sounds heavy. Tell me the hardest part first, and I will stay with you."
-
-            else ->
-                "I am listening. Keep going and I will respond to what you say."
-        }
-
-    private fun prefersEnglish(text: String): Boolean {
-        if (text.contains("영어")) return true
-        if (containsHangul(text)) return false
-        return text.any { it in 'A'..'Z' || it in 'a'..'z' }
     }
 
-    private fun containsHangul(text: String): Boolean =
-        text.any { ch -> ch in '\uAC00'..'\uD7A3' || ch in '\u3131'..'\u318E' }
+    private fun isClarificationRequest(text: String): Boolean {
+        val normalized = text.lowercase()
+        return listOf(
+            "무슨말",
+            "무슨 말",
+            "뭔말",
+            "무슨뜻",
+            "무슨 뜻",
+            "설명해",
+            "설명 좀",
+            "쉽게 말",
+            "쉽게 설명",
+            "다시 말",
+            "다시 설명",
+            "번역해",
+            "이게 뭐",
+            "이건 뭐",
+            "무슨 이야기"
+        ).any { normalized.contains(it) }
+    }
 }
