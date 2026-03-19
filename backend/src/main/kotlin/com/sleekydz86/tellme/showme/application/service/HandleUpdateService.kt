@@ -30,6 +30,7 @@ class HandleUpdateService(
     private val aiServerUpload: AiServerUploadPort,
     private val aiServerTelegram: AiServerTelegramPort,
     private val aiServerModeChat: AiServerModeChatPort,
+    private val fallbackReplyFactory: ConversationModeFallbackReplyFactory,
     private val conversationModeStore: TelegramConversationModeStore,
     private val timeAlarmService: TimeAlarmService,
     private val historySseService: HistorySseService,
@@ -156,10 +157,10 @@ class HandleUpdateService(
         }
 
         return aiServerModeChat.chat(chatId.toString(), text, activeMode)
-            .timeout(MODE_REPLY_TIMEOUT, Mono.just(buildModeFallbackReply(activeMode, text)))
+            .timeout(MODE_REPLY_TIMEOUT, Mono.just(fallbackReplyFactory.build(activeMode, text)))
             .onErrorResume { e ->
                 log.warn("Mode chat fallback activated: chatId={}, mode={}", chatId, activeMode.aiMode, e)
-                Mono.just(buildModeFallbackReply(activeMode, text))
+                Mono.just(fallbackReplyFactory.build(activeMode, text))
             }
     }
 
