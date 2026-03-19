@@ -17,20 +17,19 @@ enum class BotCommand(
     companion object {
         fun from(text: String?, allowBareAliases: Boolean = false): BotCommand? {
             if (text == null || text.isBlank()) return null
-            val commandToken = text.trim()
+            val trimmed = text.trim()
+            val commandToken = trimmed
                 .substringBefore(" ")
                 .substringBefore("@")
-            return entries.find { it.matches(commandToken, allowBareAliases) }
+            entries.find { it.value.equals(commandToken, ignoreCase = true) }?.let { return it }
+            if (!allowBareAliases) {
+                return null
+            }
+            return entries.find { it.matchesBareAlias(trimmed) }
         }
     }
 
-    private fun matches(commandToken: String, allowBareAliases: Boolean): Boolean {
-        if (value.equals(commandToken, ignoreCase = true)) {
-            return true
-        }
-        if (!allowBareAliases) {
-            return false
-        }
-        return aliases.any { alias -> alias.equals(commandToken, ignoreCase = true) }
+    private fun matchesBareAlias(text: String): Boolean {
+        return aliases.any { alias -> alias.equals(text, ignoreCase = true) }
     }
 }

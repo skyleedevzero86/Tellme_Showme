@@ -161,24 +161,21 @@ class HandleUpdateService(
             return Mono.just(timeAlarmService.continueSetup(chatId, ctx.text.orEmpty()))
         }
 
-        if (activeMode == null && ctx.isPrivateChat()) {
+        if (activeMode == null) {
             val text = ctx.text.orEmpty()
             log.info(
-                "Routing private chat text to general AI reply: chatId={}, source={}, text={}",
+                "Routing general chat text to AI reply: chatId={}, chatType={}, source={}, text={}",
                 chatId,
+                ctx.chatType,
                 ctx.inputSource,
                 text
             )
             return aiServerReply.reply(chatId.toString(), text)
                 .timeout(PRIVATE_CHAT_REPLY_TIMEOUT, Mono.just(privateChatReplyFallbackFactory.build(text)))
                 .onErrorResume { e ->
-                    log.warn("Private chat fallback activated: chatId={}, source={}", chatId, ctx.inputSource, e)
+                    log.warn("General chat fallback activated: chatId={}, chatType={}, source={}", chatId, ctx.chatType, ctx.inputSource, e)
                     Mono.just(privateChatReplyFallbackFactory.build(text))
                 }
-        }
-
-        if (activeMode == null) {
-            return echoHandler?.handle(ctx) ?: Mono.empty()
         }
 
         val text = ctx.text.orEmpty()
@@ -332,8 +329,8 @@ class HandleUpdateService(
     companion object {
         private const val EXIT_KEYWORD = "bye"
         private val MODE_REPLY_TIMEOUT: Duration = Duration.ofSeconds(3)
-        private val PRIVATE_CHAT_REPLY_TIMEOUT: Duration = Duration.ofSeconds(3)
-        private const val DEFAULT_REPLY_MESSAGE = "I received the message but could not build a reply. Please try again."
-        private const val FALLBACK_MESSAGE = "Please send text or a file (document/photo/voice/video)."
+        private val PRIVATE_CHAT_REPLY_TIMEOUT: Duration = Duration.ofSeconds(8)
+        private const val DEFAULT_REPLY_MESSAGE = "답변을 만드는 데 문제가 있었어요. 한 번만 다시 말씀해 주세요."
+        private const val FALLBACK_MESSAGE = "텍스트나 파일(문서/사진/음성/동영상)을 보내 주세요."
     }
 }

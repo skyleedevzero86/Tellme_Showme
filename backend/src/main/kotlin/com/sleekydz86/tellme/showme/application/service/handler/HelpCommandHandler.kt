@@ -13,6 +13,7 @@ class HelpCommandHandler : CommandHandler {
     companion object {
         private const val BODY = (
             "지원 기능:\n" +
+                "- 일반 질문 : 명령어 없이 보내도 AI가 응답\n" +
                 "- /start : 시작 메시지\n" +
                 "- /time : 현재 시간 안내 후 알람 설정\n" +
                 "- /alarmstop : 실행 중인 알람 중지\n" +
