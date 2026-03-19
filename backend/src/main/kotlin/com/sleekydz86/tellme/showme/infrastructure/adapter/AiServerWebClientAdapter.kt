@@ -2,6 +2,7 @@ package com.sleekydz86.tellme.showme.infrastructure.adapter
 
 import com.sleekydz86.tellme.showme.application.port.AiServerHistoryPort
 import com.sleekydz86.tellme.showme.application.port.AiServerModeChatPort
+import com.sleekydz86.tellme.showme.application.port.AiServerReplyPort
 import com.sleekydz86.tellme.showme.application.port.AiServerSearchPort
 import com.sleekydz86.tellme.showme.application.port.AiServerTelegramPort
 import com.sleekydz86.tellme.showme.application.port.AiServerUploadPort
@@ -23,7 +24,7 @@ import java.time.Instant
 @Component
 class AiServerWebClientAdapter(
     @Qualifier("aiServerWebClient") private val webClient: WebClient
-) : AiServerUploadPort, AiServerTelegramPort, AiServerHistoryPort, AiServerSearchPort, AiServerModeChatPort {
+) : AiServerUploadPort, AiServerTelegramPort, AiServerHistoryPort, AiServerSearchPort, AiServerModeChatPort, AiServerReplyPort {
     private val log = LoggerFactory.getLogger(AiServerWebClientAdapter::class.java)
 
     override fun upload(
@@ -149,6 +150,27 @@ class AiServerWebClientAdapter(
             .switchIfEmpty(Mono.error(IllegalStateException("AiServer mode reply is blank: mode=${mode.aiMode}")))
             .doOnError { e ->
                 log.warn("Failed to chat with AiServer mode: userId={}, mode={}", userId, mode.aiMode, e)
+            }
+    }
+
+    override fun reply(userId: String, message: String): Mono<String> {
+        val body = mapOf(
+            "currentUserName" to userId,
+            "message" to message,
+            "useKnowledgeBase" to false
+        )
+        return webClient.post()
+            .uri("/chat/reply")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(String::class.java)
+            .timeout(AI_SERVER_RESPONSE_TIMEOUT)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .switchIfEmpty(Mono.error(IllegalStateException("AiServer reply is blank")))
+            .doOnError { e ->
+                log.warn("Failed to chat with AiServer general reply: userId={}", userId, e)
             }
     }
 

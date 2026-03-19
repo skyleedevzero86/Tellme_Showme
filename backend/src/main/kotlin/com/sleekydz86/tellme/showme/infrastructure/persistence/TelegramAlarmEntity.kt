@@ -32,6 +32,9 @@ class TelegramAlarmEntity(
     @Column
     var timeOfDay: LocalTime? = null,
 
+    @Column(length = 500)
+    var messageText: String? = null,
+
     @Column(nullable = false)
     var nextTriggerAt: LocalDateTime = LocalDateTime.now(),
 
