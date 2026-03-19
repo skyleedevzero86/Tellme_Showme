@@ -70,13 +70,34 @@ class ModeAnswerService(
     }
 
     private fun generateResponse(mode: AssistantConversationMode, message: String, replyContext: String?): String {
+        val prompt = if (mode != AssistantConversationMode.ENG && !replyContext.isNullOrBlank() && isClarificationRequest(message)) {
+            Prompt(
+                """
+                You are helping a Korean user understand a previous assistant message from ${mode.modeName} mode.
+                The user is replying to that previous message and asking what it means.
+                Explain the previous message directly in plain Korean.
+                If the previous message contains Chinese, mixed language, or broken wording, rewrite its intended meaning in natural Korean.
+                Do not create a new quote or proverb in this case. Focus on explaining the replied message.
+                Reply only in Korean.
+
+                Previous message:
+                $replyContext
+
+                User follow-up:
+                $message
+                """.trimIndent()
+            )
+        } else {
+            mode.toPrompt(message, replyContext)
+        }
+
         val chatClient = chatClientProvider.ifAvailable
         if (chatClient != null) {
-            return chatClient.prompt(mode.toPrompt(message, replyContext)).call().content()?.trim().orEmpty()
+            return chatClient.prompt(prompt).call().content()?.trim().orEmpty()
         }
 
         logger.warn("No ChatClient bean is configured for mode chat. Trying local Ollama generate API. mode={}", mode.modeName)
-        val ollamaResponse = localOllamaCompletionService.generate(mode.toPrompt(message, replyContext).contents)
+        val ollamaResponse = localOllamaCompletionService.generate(prompt.contents)
         if (ollamaResponse.isNotBlank()) {
             return ollamaResponse
         }
@@ -123,6 +144,27 @@ class ModeAnswerService(
     private fun containsHangul(text: String): Boolean =
         text.any { ch -> ch in '\uAC00'..'\uD7A3' || ch in '\u3131'..'\u318E' }
 
+    private fun isClarificationRequest(message: String): Boolean {
+        val normalized = message.lowercase()
+        return listOf(
+            "무슨말",
+            "무슨 말",
+            "뭔말",
+            "무슨뜻",
+            "무슨 뜻",
+            "설명해",
+            "설명 좀",
+            "쉽게 말",
+            "쉽게 설명",
+            "다시 말",
+            "다시 설명",
+            "번역해",
+            "이게 뭐",
+            "이건 뭐",
+            "무슨 이야기"
+        ).any { normalized.contains(it) }
+    }
+
     private enum class AssistantConversationMode(
         val modeName: String,
         val emptyMessage: String,
@@ -151,6 +193,7 @@ class ModeAnswerService(
                 Start with one short quote, proverb, or wisdom sentence.
                 After that, add one or two short lines that connect the quote to the user's message.
                 Keep it gentle, concise, and uplifting.
+                If the user is replying to a previous message and asking what it means, explain that previous message directly instead of giving a new quote.
 
                 User message:
                 {replyContext}{message}
@@ -176,7 +219,7 @@ class ModeAnswerService(
 
             private fun replyContextSection(replyContext: String?): String =
                 replyContext?.trim()?.takeIf { it.isNotBlank() }
-                    ?.let { "The user is replying to this previous message:\n$it\n\n" }
+                    ?.let { "Previous replied message:\n$it\n\n" }
                     .orEmpty()
 
             private fun buildFallbackEnglishReply(message: String): String {
@@ -196,7 +239,7 @@ class ModeAnswerService(
             private fun buildFallbackGodReply(message: String): String {
                 val quotes = listOf(
                     "작은 걸음도 멈추지 않으면 결국 길이 됩니다.",
-                    "비 온 뒤에 땅이 굳듯, 어려운 날 뒤에도 단단함이 남습니다.",
+                    "비가 온 뒤에 땅이 굳듯, 어려움 뒤에는 단단함이 남습니다.",
                     "오늘의 버팀이 내일의 힘이 됩니다.",
                     "천천히 가도 멈추지 않으면 앞으로 갑니다."
                 )

@@ -22,8 +22,8 @@ data class MessageContext(
 
     fun replyContextSummary(): String? {
         val repliedText = replyToText?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        val sender = replyToSenderName?.trim()?.takeIf { it.isNotBlank() } ?: "상대방"
-        return "$sender: $repliedText"
+        val sender = replyToSenderName?.trim()?.takeIf { it.isNotBlank() } ?: "previous_message"
+        return "reply_sender=$sender\nreply_text=$repliedText"
     }
 
     fun commandArgument(): String? {

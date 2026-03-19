@@ -173,10 +173,10 @@ class HandleUpdateService(
                 text
             )
             return aiServerReply.reply(chatId.toString(), text, replyContext)
-                .timeout(PRIVATE_CHAT_REPLY_TIMEOUT, Mono.just(privateChatReplyFallbackFactory.build(text)))
+                .timeout(PRIVATE_CHAT_REPLY_TIMEOUT, Mono.just(privateChatReplyFallbackFactory.build(text, replyContext)))
                 .onErrorResume { e ->
                     log.warn("General chat fallback activated: chatId={}, chatType={}, source={}", chatId, ctx.chatType, ctx.inputSource, e)
-                    Mono.just(privateChatReplyFallbackFactory.build(text))
+                    Mono.just(privateChatReplyFallbackFactory.build(text, replyContext))
                 }
         }
 
