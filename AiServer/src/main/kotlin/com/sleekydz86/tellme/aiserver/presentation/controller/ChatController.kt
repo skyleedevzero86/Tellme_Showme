@@ -40,7 +40,8 @@ class ChatController(
             currentUserName = body.currentUserName,
             question = body.message,
             useKnowledgeBase = true,
-            strictKnowledgeBase = true
+            strictKnowledgeBase = true,
+            replyContext = body.replyContext
         )
     }
 
@@ -50,7 +51,8 @@ class ChatController(
             currentUserName = body.currentUserName,
             question = body.message,
             useKnowledgeBase = body.useKnowledgeBase,
-            strictKnowledgeBase = false
+            strictKnowledgeBase = false,
+            replyContext = body.replyContext
         )
     }
 
@@ -59,7 +61,8 @@ class ChatController(
         return modeAnswerService.answer(
             currentUserName = body.currentUserName,
             message = body.message,
-            mode = body.mode
+            mode = body.mode,
+            replyContext = body.replyContext
         )
     }
 }

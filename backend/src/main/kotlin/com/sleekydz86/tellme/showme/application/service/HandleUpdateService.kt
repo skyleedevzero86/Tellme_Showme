@@ -163,14 +163,16 @@ class HandleUpdateService(
 
         if (activeMode == null) {
             val text = ctx.text.orEmpty()
+            val replyContext = ctx.replyContextSummary()
             log.info(
-                "Routing general chat text to AI reply: chatId={}, chatType={}, source={}, text={}",
+                "Routing general chat text to AI reply: chatId={}, chatType={}, source={}, hasReplyContext={}, text={}",
                 chatId,
                 ctx.chatType,
                 ctx.inputSource,
+                ctx.hasReplyContext(),
                 text
             )
-            return aiServerReply.reply(chatId.toString(), text)
+            return aiServerReply.reply(chatId.toString(), text, replyContext)
                 .timeout(PRIVATE_CHAT_REPLY_TIMEOUT, Mono.just(privateChatReplyFallbackFactory.build(text)))
                 .onErrorResume { e ->
                     log.warn("General chat fallback activated: chatId={}, chatType={}, source={}", chatId, ctx.chatType, ctx.inputSource, e)
@@ -179,13 +181,14 @@ class HandleUpdateService(
         }
 
         val text = ctx.text.orEmpty()
-        log.info("Routing text to active conversation mode: chatId={}, mode={}, text={}", chatId, activeMode.aiMode, text)
+        val replyContext = ctx.replyContextSummary()
+        log.info("Routing text to active conversation mode: chatId={}, mode={}, hasReplyContext={}, text={}", chatId, activeMode.aiMode, ctx.hasReplyContext(), text)
         if (isConversationExitText(text)) {
             conversationModeStore.clear(chatId)
             return Mono.just("${activeMode.label} ended. Returning to normal conversation.")
         }
 
-        return aiServerModeChat.chat(chatId.toString(), text, activeMode)
+        return aiServerModeChat.chat(chatId.toString(), text, activeMode, replyContext)
             .timeout(MODE_REPLY_TIMEOUT, Mono.just(fallbackReplyFactory.build(activeMode, text)))
             .onErrorResume { e ->
                 log.warn("Mode chat fallback activated: chatId={}, mode={}", chatId, activeMode.aiMode, e)

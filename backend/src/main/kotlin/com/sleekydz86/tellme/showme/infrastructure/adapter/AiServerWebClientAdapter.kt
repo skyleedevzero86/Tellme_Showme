@@ -135,12 +135,13 @@ class AiServerWebClientAdapter(
             }
     }
 
-    override fun chat(userId: String, message: String, mode: ConversationMode): Mono<String> {
-        val body = mapOf(
+    override fun chat(userId: String, message: String, mode: ConversationMode, replyContext: String?): Mono<String> {
+        val body = linkedMapOf(
             "currentUserName" to userId,
             "message" to message,
             "mode" to mode.aiMode
         )
+        replyContext?.takeIf { it.isNotBlank() }?.let { body["replyContext"] = it }
         return webClient.post()
             .uri("/chat/mode")
             .contentType(MediaType.APPLICATION_JSON)
@@ -156,12 +157,13 @@ class AiServerWebClientAdapter(
             }
     }
 
-    override fun reply(userId: String, message: String): Mono<String> {
-        val body = mapOf(
+    override fun reply(userId: String, message: String, replyContext: String?): Mono<String> {
+        val body = linkedMapOf(
             "currentUserName" to userId,
             "message" to message,
             "useKnowledgeBase" to false
         )
+        replyContext?.takeIf { it.isNotBlank() }?.let { body["replyContext"] = it }
         return webClient.post()
             .uri("/chat/reply")
             .contentType(MediaType.APPLICATION_JSON)

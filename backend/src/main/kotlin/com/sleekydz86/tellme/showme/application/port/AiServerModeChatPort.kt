@@ -4,5 +4,5 @@ import com.sleekydz86.tellme.showme.domain.ConversationMode
 import reactor.core.publisher.Mono
 
 interface AiServerModeChatPort {
-    fun chat(userId: String, message: String, mode: ConversationMode): Mono<String>
+    fun chat(userId: String, message: String, mode: ConversationMode, replyContext: String? = null): Mono<String>
 }
